@@ -1,0 +1,24 @@
+app-id: com.rcsyncitmf.app
+runtime: org.gnome.Platform
+runtime-version: "51"
+sdk: org.gnome.Sdk
+command: rcsyncitmf
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --device=all
+  - --share=network
+  - --filesystem=home
+modules:
+  - name: rcsyncitmf
+    buildsystem: simple
+    build-commands:
+      - python3 -m pip install --prefix=/app --no-deps --no-build-isolation .
+      - install -Dm644 data/com.rcsyncitmf.app.desktop /app/share/applications/com.rcsyncitmf.app.desktop
+      - install -Dm644 data/icons/hicolor/scalable/apps/com.rcsyncitmf.app.svg /app/share/icons/hicolor/scalable/apps/com.rcsyncitmf.app.svg
+      - install -Dm644 data/com.rcsyncitmf.app.metainfo.xml /app/share/metainfo/com.rcsyncitmf.app.metainfo.xml
+    sources:
+      - type: dir
+        path: .

@@ -1,0 +1,20 @@
+/* RCSyncitMF custom styles (use Adwaita variables for theme compliance) */
+
+.navigation-sidebar {
+    background-color: var(--sidebar-bg-color, @sidebar_bg_color);
+}
+
+.card {
+    background: var(--card-bg-color, @card_bg_color);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.dim-caption {
+    color: var(--dim-label-color);
+    font-size: 0.85em;
+}
+
+.accent {
+    color: var(--accent-color);
+}

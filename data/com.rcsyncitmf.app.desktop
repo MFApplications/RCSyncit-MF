@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=RCSyncitMF
+GenericName=Rclone Manager
+Comment=Gestor GNOME para rclone con multi-config y union sync
+Exec=rcsyncitmf %U
+Icon=com.rcsyncitmf.app
+Terminal=false
+Categories=Network;FileTransfer;Utility;
+StartupNotify=true
+StartupWMClass=com.rcsyncitmf.app

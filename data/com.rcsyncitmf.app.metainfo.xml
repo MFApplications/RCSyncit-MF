@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.rcsyncitmf.app</id>
+  <name>RCSyncitMF</name>
+  <summary>Gestor GNOME para rclone</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>RCSyncitMF permite gestionar múltiples archivos de configuración de rclone, remotos, unions y mounts desde una interfaz GNOME (libadwaita), incluyendo sincronización de la estructura de directorios entre upstreams de un union.</p>
+  </description>
+  <launchable type="desktop-id">com.rcsyncitmf.app.desktop</launchable>
+  <icon type="stock">com.rcsyncitmf.app</icon>
+  <categories>
+    <category>Network</category>
+    <category>FileTransfer</category>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+</component>
