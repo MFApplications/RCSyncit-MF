@@ -1,6 +1,6 @@
 # RCSyncitMF
 
-![RCSyncitMF logo](data/icons/hicolor/scalable/apps/io.github.MFApplications.RCSyncitMF.svg)
+![RCSyncitMF logo](src/rcsyncitmf/resources/RCSyncitMF-logo.png)
 
 GNOME/libadwaita manager for rclone with multi-profile support.
 
