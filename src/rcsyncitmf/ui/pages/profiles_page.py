@@ -275,7 +275,10 @@ class ProfilesPage(Gtk.Box):
             dlg.present(self.window)
 
         def on_error(exc):
-            if profile_store.encrypted_flag(path) is True and profile_store.get_cached_password(path) is None:
+            if (
+                profile_store.encrypted_flag(path) is True
+                and profile_store.get_cached_password(path) is None
+            ):
                 self.window.ask_profile_password(path, lambda _p: self._on_inspect(None))
             else:
                 self.window.toast(_("Error: {exc}").format(exc=exc))

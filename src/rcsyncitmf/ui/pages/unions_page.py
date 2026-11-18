@@ -469,7 +469,12 @@ class UnionsPage(Gtk.Box):
         summary.append(Gtk.Label(label=_("Union: {u}").format(u=union_name), xalign=0))
         summary.append(Gtk.Label(label=_("Upstreams: {u}").format(u=", ".join(ups)), xalign=0))
         summary.append(
-            Gtk.Label(label=_("Modo: sincronización de estructura (creaciones; borrados deshabilitados por seguridad)"), xalign=0)
+            Gtk.Label(
+                label=_(
+                    "Modo: sincronización de estructura (creaciones; borrados deshabilitados por seguridad)"
+                ),
+                xalign=0,
+            )
         )
         last = sync_state.last_sync(self._profile, union_name)
         if last:

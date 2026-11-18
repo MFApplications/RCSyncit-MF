@@ -150,7 +150,9 @@ class SettingsPage(Gtk.Box):
         icon_box.set_margin_bottom(12)
         from pathlib import Path as _Path
 
-        _logo_path = _Path(__file__).resolve().parent.parent.parent / "resources" / "RCSyncitMF-logo.png"
+        _logo_path = (
+            _Path(__file__).resolve().parent.parent.parent / "resources" / "RCSyncitMF-logo.png"
+        )
         if _logo_path.exists():
             icon_label = Gtk.Picture.new_for_filename(str(_logo_path))
             icon_label.set_size_request(128, 128)

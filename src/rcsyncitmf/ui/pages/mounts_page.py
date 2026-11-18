@@ -92,7 +92,9 @@ class MountsPage(Gtk.Box):
             if not mounts and not cached:
                 empty = Adw.StatusPage(
                     title=_("Sin mounts"),
-                    description=_("Monta un remoto desde Remotos o Unions; aquí solo se desmontan."),
+                    description=_(
+                        "Monta un remoto desde Remotos o Unions; aquí solo se desmontan."
+                    ),
                     icon_name="drive-harddisk-symbolic",
                 )
                 self.cards_box.append(empty)
@@ -171,7 +173,11 @@ class MountsPage(Gtk.Box):
         name_label = Gtk.Label(label=remote, xalign=0)
         name_label.add_css_class("heading")
         info.append(name_label)
-        parent = self._crypt_parents.get(remote) if hasattr(self, "_crypt_parents") else mount_manager.crypt_parent(remote)
+        parent = (
+            self._crypt_parents.get(remote)
+            if hasattr(self, "_crypt_parents")
+            else mount_manager.crypt_parent(remote)
+        )
         if parent:
             crypt_label = Gtk.Label(label=f"(crypt sobre {parent})", xalign=0)
             crypt_label.add_css_class("dim-label")
@@ -306,7 +312,11 @@ class MountsPage(Gtk.Box):
         name_label = Gtk.Label(label=f"{remote} (cache)", xalign=0)
         name_label.add_css_class("heading")
         info.append(name_label)
-        parent = self._crypt_parents.get(remote) if hasattr(self, "_crypt_parents") else mount_manager.crypt_parent(remote)
+        parent = (
+            self._crypt_parents.get(remote)
+            if hasattr(self, "_crypt_parents")
+            else mount_manager.crypt_parent(remote)
+        )
         if parent:
             crypt_label = Gtk.Label(label=f"(crypt sobre {parent})", xalign=0)
             crypt_label.add_css_class("dim-label")

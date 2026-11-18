@@ -257,11 +257,10 @@ def list_providers() -> list[dict]:
 
 _RCLONE_BIN_CACHE: dict[str, str] = {}
 
+
 def invalidate_rclone_bin_cache() -> None:
     """Clear the cached rclone binary resolution (call after settings change)."""
     _RCLONE_BIN_CACHE.clear()
-
-
 
 
 def rclone_bin() -> str:

@@ -324,6 +324,7 @@ async def unmount(mountpoint: Path) -> None:
     # Remove empty parent directories up to the mounts base so no orphan
     # folders (profile/remote) are left behind (security: no stale dirs).
     import contextlib
+
     with contextlib.suppress(Exception):
         _remove_empty_parents(mountpoint, default_mounts_base())
     _remove_bookmark(mountpoint)
@@ -387,6 +388,7 @@ def remove_stale() -> None:
                 kept.append(r)
         _save_unlocked(kept)
     import contextlib
+
     with contextlib.suppress(Exception):
         cleanup_empty_mount_dirs()
 
