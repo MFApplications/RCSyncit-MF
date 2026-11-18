@@ -18,3 +18,14 @@
 .accent {
     color: var(--accent-color);
 }
+
+.compact-btn {
+    margin: 4px;
+}
+
+/* Selected row in the file manager */
+.selected {
+    background-color: var(--accent-bg-color, @accent_bg_color);
+    color: var(--accent-fg-color, @accent_fg_color);
+    border-radius: 6px;
+}

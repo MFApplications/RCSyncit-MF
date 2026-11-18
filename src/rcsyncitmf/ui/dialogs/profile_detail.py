@@ -11,6 +11,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gtk
 
+from ...i18n import _
 from ...services import mount_manager, profile_store, rclone
 from ...ui.async_helper import run_async
 from ...ui.dialogs.remote_dialog import RemoteDialog
@@ -57,7 +58,7 @@ class ProfileDetailDialog(Adw.Dialog):
         super().__init__()
         self.window = window
         self.profile = profile
-        self.set_title(f"Perfil: {profile.stem}")
+        self.set_title(_("Perfil: {n}").format(n=profile.stem))
         self.set_content_width(860)
         self.set_content_height(640)
 
@@ -74,7 +75,7 @@ class ProfileDetailDialog(Adw.Dialog):
         header.append(title)
         spacer = Gtk.Box(hexpand=True)
         header.append(spacer)
-        close_btn = Gtk.Button(label="Cerrar")
+        close_btn = Gtk.Button(label=_("Cerrar"))
         close_btn.connect("clicked", lambda _b: self.close())
         header.append(close_btn)
         outer.append(header)
@@ -95,20 +96,20 @@ class ProfileDetailDialog(Adw.Dialog):
         scrolled.set_child(self.accounts_list)
         self.accounts_box.append(scrolled)
         acc_btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        new_btn = Gtk.Button(label="Nuevo remoto")
+        new_btn = Gtk.Button(label=_("Nuevo remoto"))
         new_btn.add_css_class("suggested-action")
         new_btn.connect("clicked", lambda _b: self._new_remote())
         acc_btns.append(new_btn)
-        refresh_btn = Gtk.Button(label="Actualizar")
+        refresh_btn = Gtk.Button(label=_("Actualizar"))
         refresh_btn.connect("clicked", lambda _b: self._load_accounts())
         acc_btns.append(refresh_btn)
         self.accounts_box.append(acc_btns)
-        self.stack.add_titled(self.accounts_box, "accounts", "Cuentas")
+        self.stack.add_titled(self.accounts_box, "accounts", _("Cuentas"))
 
         # Page 2: VFS / cache
         self.vfs_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self._build_vfs_form()
-        self.stack.add_titled(self.vfs_box, "vfs", "VFS / Cache")
+        self.stack.add_titled(self.vfs_box, "vfs", _("VFS / Cache"))
 
         self.set_child(outer)
         self._load_accounts()
@@ -131,8 +132,8 @@ class ProfileDetailDialog(Adw.Dialog):
         def ok(dump):
             if not isinstance(dump, dict) or not dump:
                 empty = Adw.StatusPage(
-                    title="Sin remotos",
-                    description="Crea tu primer remoto.",
+                    title=_("Sin remotos"),
+                    description=_("Crea tu primer remoto."),
                     icon_name="network-server-symbolic",
                 )
                 self.accounts_list.append(empty)
@@ -170,7 +171,7 @@ class ProfileDetailDialog(Adw.Dialog):
                         crypt_name = crypt_map[name]
                         sub = Adw.ActionRow()
                         sub.set_title(f"Encriptado ({crypt_name})")
-                        sub.set_subtitle("type: crypt")
+                        sub.set_subtitle(_("type: crypt"))
                         lock = Gtk.Image.new_from_icon_name("channel-secure-symbolic")
                         sub.add_prefix(lock)
                         edit_crypt = Gtk.Button(icon_name="document-edit-symbolic")
@@ -203,7 +204,7 @@ class ProfileDetailDialog(Adw.Dialog):
             ):
                 self.window.ask_profile_password(self.profile, lambda _p: self._load_accounts())
             else:
-                self.window.toast(f"Error: {exc}")
+                self.window.toast(_("Error: {exc}").format(exc=exc))
 
         run_async(fetch(), on_success=ok, on_error=err)
 
@@ -248,12 +249,12 @@ class ProfileDetailDialog(Adw.Dialog):
                 async def do():
                     await rclone.delete_remote(self.profile, name)
 
-                def ok(_):
+                def ok(_result):
                     self.window.toast(f"Eliminado {name}")
                     self._load_accounts()
 
                 def err(exc):
-                    self.window.toast(f"Error: {exc}")
+                    self.window.toast(_("Error: {exc}").format(exc=exc))
 
                 run_async(do(), on_success=ok, on_error=err)
             d.close() if hasattr(d, "close") else None
@@ -274,14 +275,14 @@ class ProfileDetailDialog(Adw.Dialog):
         self._applying_preset = False
 
         self.preset_row = Adw.ComboRow()
-        self.preset_row.set_title("Preset de cache")
+        self.preset_row.set_title(_("Preset de cache"))
         preset_model = Gtk.StringList.new(list(VFS_PRESETS.keys()))
         self.preset_row.set_model(preset_model)
         self.preset_row.set_selected(2)  # Medio
         group.add(self.preset_row)
 
         self.cache_mode_row = Adw.ComboRow()
-        self.cache_mode_row.set_title("VFS cache mode")
+        self.cache_mode_row.set_title(_("VFS cache mode"))
         model = Gtk.StringList.new(VFS_CACHE_MODES)
         self.cache_mode_row.set_model(model)
         group.add(self.cache_mode_row)
@@ -365,7 +366,7 @@ class ProfileDetailDialog(Adw.Dialog):
         )
 
         self.umask_row = Adw.EntryRow()
-        self.umask_row.set_title("Umask (octal)")
+        self.umask_row.set_title(_("Umask (octal)"))
         self.umask_row.set_input_purpose(Gtk.InputPurpose.NUMBER)
         self.umask_row.set_text("022")
 
@@ -377,6 +378,39 @@ class ProfileDetailDialog(Adw.Dialog):
 
         self.umask_row.connect("changed", _validate_umask)
         group.add(self.umask_row)
+
+        # Mount options (Fase A) mixed into the VFS group
+        self.read_only_row = Adw.SwitchRow()
+        self.read_only_row.set_title(_("Solo lectura"))
+        self.read_only_row.set_subtitle(_("Monta el remoto en modo read-only"))
+        group.add(self.read_only_row)
+
+        self.allow_other_row = Adw.SwitchRow()
+        self.allow_other_row.set_title(_("Permitir otros usuarios"))
+        self.allow_other_row.set_subtitle(_("Requiere user_allow_other en /etc/fuse.conf"))
+        group.add(self.allow_other_row)
+
+        self.network_mode_row = Adw.SwitchRow()
+        self.network_mode_row.set_title(_("Modo red"))
+        self.network_mode_row.set_subtitle(_("Marca el mount como unidad de red"))
+        group.add(self.network_mode_row)
+
+        self.attr_timeout_row = Adw.SpinRow.new_with_range(0, 60, 1)
+        self.attr_timeout_row.set_title(_("Attr timeout (s)"))
+        self.attr_timeout_row.set_subtitle(_("Cache de atributos (0 = sin cache)"))
+        self.attr_timeout_row.set_value(1)
+        group.add(self.attr_timeout_row)
+
+        self.vfs_read_ahead_row = Adw.SpinRow.new_with_range(0, 256, 1)
+        self.vfs_read_ahead_row.set_title(_("VFS read-ahead (MB)"))
+        self.vfs_read_ahead_row.set_subtitle(_("Prelectura de archivos"))
+        self.vfs_read_ahead_row.set_value(0)
+        group.add(self.vfs_read_ahead_row)
+
+        self.vfs_fast_fingerprint_row = Adw.SwitchRow()
+        self.vfs_fast_fingerprint_row.set_title(_("Fast fingerprint"))
+        self.vfs_fast_fingerprint_row.set_subtitle(_("Usa size+modtime en vez de hash"))
+        group.add(self.vfs_fast_fingerprint_row)
 
         # Connect preset handling
         self.preset_row.connect("notify::selected", lambda *_: self._apply_preset())
@@ -400,11 +434,11 @@ class ProfileDetailDialog(Adw.Dialog):
 
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         btn_box.set_margin_top(8)
-        save_btn = Gtk.Button(label="Guardar")
+        save_btn = Gtk.Button(label=_("Guardar"))
         save_btn.add_css_class("suggested-action")
         save_btn.connect("clicked", lambda _b: self._save_vfs())
         btn_box.append(save_btn)
-        reset_btn = Gtk.Button(label="Restaurar defaults")
+        reset_btn = Gtk.Button(label=_("Restaurar defaults"))
         reset_btn.connect("clicked", lambda _b: self._reset_vfs())
         btn_box.append(reset_btn)
         self.vfs_box.append(btn_box)
@@ -501,6 +535,13 @@ class ProfileDetailDialog(Adw.Dialog):
         self._applying_preset = False
         self.umask_row.set_text(umask_str if umask_str else "022")
 
+        self.read_only_row.set_active(bool(vfs.get("read_only", False)))
+        self.allow_other_row.set_active(bool(vfs.get("allow_other", False)))
+        self.network_mode_row.set_active(bool(vfs.get("network_mode", False)))
+        self.attr_timeout_row.set_value(float(vfs.get("attr_timeout", 1)))
+        self.vfs_read_ahead_row.set_value(float(vfs.get("vfs_read_ahead", 0)))
+        self.vfs_fast_fingerprint_row.set_active(bool(vfs.get("vfs_fast_fingerprint", False)))
+
     def _save_vfs(self) -> None:
         meta = profile_store.load_meta(self.profile)
         meta["vfs"] = {
@@ -516,9 +557,15 @@ class ProfileDetailDialog(Adw.Dialog):
             "dir_cache_time": f"{int(self.dir_cache_scale.get_value())}s",
             "poll_interval": f"{int(self.poll_scale.get_value())}s",
             "umask": (self.umask_row.get_text().strip() or "022"),
+            "read_only": bool(self.read_only_row.get_active()),
+            "allow_other": bool(self.allow_other_row.get_active()),
+            "network_mode": bool(self.network_mode_row.get_active()),
+            "attr_timeout": int(self.attr_timeout_row.get_value()),
+            "vfs_read_ahead": f"{int(self.vfs_read_ahead_row.get_value())}M",
+            "vfs_fast_fingerprint": bool(self.vfs_fast_fingerprint_row.get_active()),
         }
         profile_store.save_meta(self.profile, meta)
-        self.window.toast("Opciones VFS guardadas")
+        self.window.toast(_("Opciones VFS guardadas"))
         self.close()
 
     def _reset_vfs(self) -> None:
@@ -533,9 +580,15 @@ class ProfileDetailDialog(Adw.Dialog):
             "dir_cache_time": "5m0s",
             "poll_interval": "1m0s",
             "umask": "022",
+            "read_only": False,
+            "allow_other": False,
+            "network_mode": False,
+            "attr_timeout": 1,
+            "vfs_read_ahead": "0M",
+            "vfs_fast_fingerprint": False,
         }
         meta = profile_store.load_meta(self.profile)
         meta["vfs"] = defaults
         profile_store.save_meta(self.profile, meta)
         self._load_vfs()
-        self.window.toast("Valores por defecto restaurados")
+        self.window.toast(_("Valores por defecto restaurados"))

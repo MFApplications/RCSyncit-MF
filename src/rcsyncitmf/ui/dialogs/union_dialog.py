@@ -12,6 +12,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gtk
 
+from ...i18n import _
 from ...services import rclone
 from ...ui.async_helper import run_async
 
@@ -89,7 +90,7 @@ class UnionDialog(Adw.AlertDialog):
 
         # Profile selector
         prof_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        prof_row.append(Gtk.Label(label="Perfil", xalign=0))
+        prof_row.append(Gtk.Label(label=_("Perfil"), xalign=0))
         self.profile_combo = Gtk.ComboBoxText()
         for p in self.profiles:
             self.profile_combo.append_text(p.stem)
@@ -106,16 +107,18 @@ class UnionDialog(Adw.AlertDialog):
 
         # Name
         name_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        name_row.append(Gtk.Label(label="Nombre", xalign=0))
+        name_row.append(Gtk.Label(label=_("Nombre"), xalign=0))
         self.name_entry = Gtk.Entry()
         self.name_entry.set_hexpand(True)
         name_row.append(self.name_entry)
         box.append(name_row)
 
         # Upstreams
-        box.append(Gtk.Label(label="Upstreams (remoto:/carpeta)", xalign=0))
+        box.append(Gtk.Label(label=_("Upstreams (remoto:/carpeta)"), xalign=0))
         help_lbl = Gtk.Label(
-            label="Añade uno o más upstreams. Cada uno puede apuntar a una carpeta concreta (ej. Almacen1:/almacen).",
+            label=_(
+                "Añade uno o más upstreams. Cada uno puede apuntar a una carpeta concreta (ej. Almacen1:/almacen)."
+            ),
             xalign=0,
         )
         help_lbl.add_css_class("dim-label")
@@ -128,7 +131,7 @@ class UnionDialog(Adw.AlertDialog):
         self._union_upstream_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.append(self._union_upstream_box)
 
-        add_btn = Gtk.Button(label="Añadir upstream")
+        add_btn = Gtk.Button(label=_("Añadir upstream"))
         add_btn.connect("clicked", lambda _b: self._add_union_upstream_row())
         box.append(add_btn)
 
@@ -144,12 +147,14 @@ class UnionDialog(Adw.AlertDialog):
             r = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
             r.append(Gtk.Label(label=f"{label} ({attr.replace('_combo', '_policy')})", xalign=0))
             combo = Gtk.ComboBoxText()
-            for p in POLICIES:
-                combo.append_text(p)
+            for pol in POLICIES:
+                combo.append_text(pol)
             combo.set_active(POLICIES.index(default) if default in POLICIES else 0)
             combo.set_hexpand(True)
             r.append(combo)
-            hint = Gtk.Label(label=", ".join(f"{k}={v}" for k, v in POLICY_HINTS.items()), xalign=0)
+            hint = Gtk.Label(
+                label=_(", ").join(f"{k}={v}" for k, v in POLICY_HINTS.items()), xalign=0
+            )
             hint.add_css_class("dim-label")
             hint.add_css_class("caption")
             hint.set_wrap(True)
@@ -158,14 +163,14 @@ class UnionDialog(Adw.AlertDialog):
             setattr(self, attr, combo)
 
         # Optional encryption
-        self.encrypt_check = Gtk.CheckButton(label="Encriptar este union")
+        self.encrypt_check = Gtk.CheckButton(label=_("Encriptar este union"))
         box.append(self.encrypt_check)
 
         self.crypt_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.crypt_box.set_visible(False)
 
         crypt_name_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        crypt_name_row.append(Gtk.Label(label="Nombre del crypt", xalign=0))
+        crypt_name_row.append(Gtk.Label(label=_("Nombre del crypt"), xalign=0))
         self.crypt_name_entry = Gtk.Entry()
         self.crypt_name_entry.set_hexpand(True)
         self.crypt_name_entry.set_placeholder_text("ej. miunion_crypt")
@@ -173,7 +178,7 @@ class UnionDialog(Adw.AlertDialog):
         self.crypt_box.append(crypt_name_row)
 
         fn_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        fn_row.append(Gtk.Label(label="Filename encryption", xalign=0))
+        fn_row.append(Gtk.Label(label=_("Filename encryption"), xalign=0))
         self.fn_combo = Gtk.ComboBoxText()
         for v in FILENAME_ENCRYPTIONS:
             self.fn_combo.append_text(v)
@@ -181,7 +186,9 @@ class UnionDialog(Adw.AlertDialog):
         self.fn_combo.set_hexpand(True)
         fn_row.append(self.fn_combo)
         fn_help = Gtk.Label(
-            label="standard: cifra nombres; obfuscate: ofusca; off: no cifra nombres (directory_name_encryption no tiene efecto).",
+            label=_(
+                "standard: cifra nombres; obfuscate: ofusca; off: no cifra nombres (directory_name_encryption no tiene efecto)."
+            ),
             xalign=0,
         )
         fn_help.add_css_class("dim-label")
@@ -191,7 +198,7 @@ class UnionDialog(Adw.AlertDialog):
         self.crypt_box.append(fn_row)
 
         dn_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        dn_row.append(Gtk.Label(label="Directory name encryption", xalign=0))
+        dn_row.append(Gtk.Label(label=_("Directory name encryption"), xalign=0))
         self.dn_combo = Gtk.ComboBoxText()
         for v in DIRECTORY_ENCRYPTIONS:
             self.dn_combo.append_text(v)
@@ -199,7 +206,7 @@ class UnionDialog(Adw.AlertDialog):
         self.dn_combo.set_hexpand(True)
         dn_row.append(self.dn_combo)
         dn_help = Gtk.Label(
-            label="true: cifra nombres de carpetas; false: los deja intactos.", xalign=0
+            label=_("true: cifra nombres de carpetas; false: los deja intactos."), xalign=0
         )
         dn_help.add_css_class("dim-label")
         dn_help.add_css_class("caption")
@@ -208,7 +215,7 @@ class UnionDialog(Adw.AlertDialog):
         self.crypt_box.append(dn_row)
 
         pwd_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        pwd_row.append(Gtk.Label(label="Contraseña", xalign=0))
+        pwd_row.append(Gtk.Label(label=_("Contraseña"), xalign=0))
         self.crypt_pwd_entry = Gtk.Entry()
         self.crypt_pwd_entry.set_visibility(False)
         self.crypt_pwd_entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
@@ -217,7 +224,7 @@ class UnionDialog(Adw.AlertDialog):
         self.crypt_box.append(pwd_row)
 
         pwd2_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        pwd2_row.append(Gtk.Label(label="Contraseña 2 (salt, opcional)", xalign=0))
+        pwd2_row.append(Gtk.Label(label=_("Contraseña 2 (salt, opcional)"), xalign=0))
         self.crypt_pwd2_entry = Gtk.Entry()
         self.crypt_pwd2_entry.set_visibility(False)
         self.crypt_pwd2_entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
@@ -226,7 +233,9 @@ class UnionDialog(Adw.AlertDialog):
         self.crypt_box.append(pwd2_row)
 
         salt_help = Gtk.Label(
-            label="La segunda contraseña (salt) fortalece la derivación de claves. Si la usas, debes recordarla siempre.",
+            label=_(
+                "La segunda contraseña (salt) fortalece la derivación de claves. Si la usas, debes recordarla siempre."
+            ),
             xalign=0,
         )
         salt_help.add_css_class("dim-label")
@@ -292,9 +301,12 @@ class UnionDialog(Adw.AlertDialog):
         if idx < 0 or idx >= len(self.profiles):
             return
         self.profile = self.profiles[idx]
+        profile = self.profile
+        if profile is None:
+            return
 
         async def fetch():
-            return await rclone.list_remotes(self.profile)
+            return await rclone.list_remotes(profile)
 
         def on_success(names):
             self.available = list(names or [])
@@ -306,7 +318,7 @@ class UnionDialog(Adw.AlertDialog):
                 self._add_union_upstream_row()
 
         def on_error(exc):
-            self.window.toast(f"Error: {exc}")
+            self.window.toast(_("Error: {exc}").format(exc=exc))
 
         run_async(fetch(), on_success=on_success, on_error=on_error)
 
@@ -331,15 +343,16 @@ class UnionDialog(Adw.AlertDialog):
             self.close()
             return
         if self.profile is None:
-            self.window.toast("Selecciona un perfil")
+            self.window.toast(_("Selecciona un perfil"))
             return
+        profile = self.profile
         name = self.name_entry.get_text().strip()
         if not name:
-            self.window.toast("El nombre es obligatorio")
+            self.window.toast(_("El nombre es obligatorio"))
             return
         parts = self._collect_upstreams()
         if not parts:
-            self.window.toast("Añade al menos un upstream")
+            self.window.toast(_("Añade al menos un upstream"))
             return
 
         opts = {
@@ -357,14 +370,14 @@ class UnionDialog(Adw.AlertDialog):
                 self.crypt_name_entry.set_text(crypt_name)
             pwd = self.crypt_pwd_entry.get_text()
             if not pwd:
-                self.window.toast("La contraseña es obligatoria para encriptar")
+                self.window.toast(_("La contraseña es obligatoria para encriptar"))
                 return
             pwd2 = self.crypt_pwd2_entry.get_text().strip()
             fn_enc = self.fn_combo.get_active_text() or "standard"
             dn_enc = self.dn_combo.get_active_text() or "true"
 
         async def do():
-            await rclone.create_remote(self.profile, name, "union", opts)
+            await rclone.create_remote(profile, name, "union", opts)
             if encrypt:
                 crypt_opts = {
                     "remote": f"{name}:",
@@ -374,9 +387,15 @@ class UnionDialog(Adw.AlertDialog):
                 }
                 if pwd2:
                     crypt_opts["password2"] = pwd2
-                await rclone.create_remote(self.profile, crypt_name, "crypt", crypt_opts)
+                await rclone.create_remote(profile, crypt_name, "crypt", crypt_opts)
 
-        def ok(_):
+        def ok(_result):
+            try:
+                from ...services import mount_manager
+
+                mount_manager._invalidate_profile_dump_cache(self.profile)
+            except Exception:
+                pass
             if encrypt:
                 self.window.toast(f"Union '{name}' y crypt '{crypt_name}' creados")
             else:
@@ -386,6 +405,6 @@ class UnionDialog(Adw.AlertDialog):
             self.close()
 
         def err(exc):
-            self.window.toast(f"Error: {exc}")
+            self.window.toast(_("Error: {exc}").format(exc=exc))
 
         run_async(do(), on_success=ok, on_error=err)

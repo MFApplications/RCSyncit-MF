@@ -11,6 +11,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gtk
 
+from ...i18n import _
 from ...services import profile_store
 from ...ui.async_helper import run_async
 
@@ -32,19 +33,19 @@ class ProfilesPage(Gtk.Box):
         header.set_margin_start(12)
         header.set_margin_end(12)
 
-        title = Gtk.Label(label="Perfiles", xalign=0)
+        title = Gtk.Label(label=_("Perfiles"), xalign=0)
         title.add_css_class("title-2")
         header.append(title)
 
         spacer = Gtk.Box(hexpand=True)
         header.append(spacer)
 
-        self.btn_new = Gtk.Button(label="Nuevo perfil")
+        self.btn_new = Gtk.Button(label=_("Nuevo perfil"))
         self.btn_new.add_css_class("suggested-action")
         self.btn_new.connect("clicked", self._on_new)
         header.append(self.btn_new)
 
-        self.btn_import = Gtk.Button(label="Importar")
+        self.btn_import = Gtk.Button(label=_("Importar"))
         self.btn_import.connect("clicked", self._on_import)
         header.append(self.btn_import)
 
@@ -72,12 +73,12 @@ class ProfilesPage(Gtk.Box):
         bottom.set_margin_end(12)
         spacer = Gtk.Box(hexpand=True)
         bottom.append(spacer)
-        btn_new = Gtk.Button(label="Nuevo perfil")
+        btn_new = Gtk.Button(label=_("Nuevo perfil"))
         btn_new.add_css_class("suggested-action")
         btn_new.connect("clicked", self._on_new)
         bottom.append(btn_new)
 
-        self.btn_delete = Gtk.Button(label="Eliminar perfil")
+        self.btn_delete = Gtk.Button(label=_("Eliminar perfil"))
         self.btn_delete.add_css_class("destructive-action")
         self.btn_delete.connect("clicked", self._on_delete)
         self.btn_delete.set_sensitive(False)
@@ -99,11 +100,11 @@ class ProfilesPage(Gtk.Box):
         profiles = profile_store.list_profiles()
         if not profiles:
             empty = Adw.StatusPage(
-                title="Sin perfiles",
-                description="Crea tu primer perfil de rclone (.conf).",
+                title=_("Sin perfiles"),
+                description=_("Crea tu primer perfil de rclone (.conf)."),
                 icon_name="document-new-symbolic",
             )
-            btn = Gtk.Button(label="Crear primer perfil")
+            btn = Gtk.Button(label=_("Crear primer perfil"))
             btn.add_css_class("suggested-action")
             btn.set_halign(Gtk.Align.CENTER)
             btn.connect("clicked", self._on_new)
@@ -158,7 +159,7 @@ class ProfilesPage(Gtk.Box):
             self.window.set_current_profile(path)
 
     def _on_new(self, _btn) -> None:
-        dlg = Adw.AlertDialog.new("Nuevo perfil", "")
+        dlg = Adw.AlertDialog.new(_("Nuevo perfil"), "")
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_top(12)
         box.set_margin_bottom(12)
@@ -166,12 +167,12 @@ class ProfilesPage(Gtk.Box):
         box.set_margin_end(12)
 
         entry = Gtk.Entry()
-        entry.set_placeholder_text("nombre del perfil")
+        entry.set_placeholder_text(_("nombre del perfil"))
         box.append(entry)
 
         dlg.set_extra_child(box)
-        dlg.add_response("cancel", "Cancelar")
-        dlg.add_response("create", "Crear")
+        dlg.add_response("cancel", _("Cancelar"))
+        dlg.add_response("create", _("Crear"))
         dlg.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("create")
         dlg.set_close_response("cancel")
@@ -182,9 +183,9 @@ class ProfilesPage(Gtk.Box):
                 if name:
                     try:
                         profile_store.create_profile(name)
-                        self.window.toast(f"Perfil '{name}' creado")
+                        self.window.toast(_("Perfil '{name}' creado").format(name=name))
                     except Exception as exc:
-                        self.window.toast(f"Error: {exc}")
+                        self.window.toast(_("Error: {exc}").format(exc=exc))
                     self.refresh()
             d.close()
 
@@ -192,7 +193,7 @@ class ProfilesPage(Gtk.Box):
         dlg.present(self.window)
 
     def _on_import(self, _btn) -> None:
-        dialog = Gtk.FileDialog(title="Importar perfil rclone")
+        dialog = Gtk.FileDialog(title=_("Importar perfil rclone"))
         dialog.set_filters([Gtk.FileFilter.new()])  # placeholder
 
         def on_open(d, res):
@@ -206,21 +207,21 @@ class ProfilesPage(Gtk.Box):
                 self.window._import_profile(Path(f.get_path()))
                 self.refresh()
             except Exception as exc:
-                self.window.toast(f"Error: {exc}")
+                self.window.toast(_("Error: {exc}").format(exc=exc))
 
         dialog.open(self.window, None, on_open)
 
     def _on_view_config(self, _btn=None) -> None:
         path = self._selected_path()
         if path is None:
-            self.window.toast("Selecciona un perfil")
+            self.window.toast(_("Selecciona un perfil"))
             return
         try:
             text = path.read_text(encoding="utf-8")
         except OSError as exc:
-            self.window.toast(f"Error leyendo: {exc}")
+            self.window.toast(_("Error leyendo: {exc}").format(exc=exc))
             return
-        dlg = Adw.AlertDialog.new(f"Config: {path.name}", "")
+        dlg = Adw.AlertDialog.new(_("Config: {name}").format(name=path.name), "")
         view = Gtk.TextView()
         view.set_editable(False)
         view.set_monospace(True)
@@ -230,7 +231,7 @@ class ProfilesPage(Gtk.Box):
         scrolled.set_min_content_width(480)
         scrolled.set_child(view)
         dlg.set_extra_child(scrolled)
-        dlg.add_response("close", "Cerrar")
+        dlg.add_response("close", _("Cerrar"))
         dlg.set_default_response("close")
         dlg.set_close_response("close")
         dlg.present(self.window)
@@ -238,7 +239,7 @@ class ProfilesPage(Gtk.Box):
     def _on_inspect(self, _btn=None) -> None:
         path = self._selected_path()
         if path is None:
-            self.window.toast("Selecciona un perfil")
+            self.window.toast(_("Selecciona un perfil"))
             return
 
         from ...services import rclone
@@ -258,7 +259,7 @@ class ProfilesPage(Gtk.Box):
                     lines.append("")
             if not lines:
                 lines = ["(sin remotos)"]
-            dlg = Adw.AlertDialog.new(f"Inspector: {path.stem}", "")
+            dlg = Adw.AlertDialog.new(_("Inspector: {name}").format(name=path.stem), "")
             view = Gtk.TextView()
             view.set_editable(False)
             view.set_monospace(True)
@@ -268,27 +269,27 @@ class ProfilesPage(Gtk.Box):
             scrolled.set_min_content_width(480)
             scrolled.set_child(view)
             dlg.set_extra_child(scrolled)
-            dlg.add_response("close", "Cerrar")
+            dlg.add_response("close", _("Cerrar"))
             dlg.set_default_response("close")
             dlg.set_close_response("close")
             dlg.present(self.window)
 
         def on_error(exc):
-            if profile_store.is_encrypted(path) and profile_store.get_cached_password(path) is None:
+            if profile_store.encrypted_flag(path) is True and profile_store.get_cached_password(path) is None:
                 self.window.ask_profile_password(path, lambda _p: self._on_inspect(None))
             else:
-                self.window.toast(f"Error: {exc}")
+                self.window.toast(_("Error: {exc}").format(exc=exc))
 
         run_async(fetch(), on_success=on_success, on_error=on_error)
 
     def _on_toggle_encrypt(self, _btn=None) -> None:
         path = self._selected_path()
         if path is None:
-            self.window.toast("Selecciona un perfil")
+            self.window.toast(_("Selecciona un perfil"))
             return
-        if profile_store.is_encrypted(path):
+        if profile_store.encrypted_flag(path) is True:
             profile_store.clear_cached_password(path)
-            self.window.toast(f"{path.stem} marcado como no encriptado")
+            self.window.toast(_("{name} marcado como no encriptado").format(name=path.stem))
             self.refresh()
         else:
             self.window.ask_profile_password(path, lambda pwd: self._finish_encrypt(path, pwd))
@@ -297,7 +298,7 @@ class ProfilesPage(Gtk.Box):
         from ...services import profile_store
 
         profile_store.cache_password(path, pwd)
-        self.window.toast(f"{path.stem} marcado como encriptado")
+        self.window.toast(_("{name} marcado como encriptado").format(name=path.stem))
         self.refresh()
 
     def _on_delete(self, _btn) -> None:
@@ -305,11 +306,11 @@ class ProfilesPage(Gtk.Box):
         if path is None:
             return
         dlg = Adw.AlertDialog.new(
-            "Eliminar perfil",
-            f"¿Eliminar el perfil '{path.stem}'? El archivo .conf se borrará.",
+            _("Eliminar perfil"),
+            _("¿Eliminar el perfil '{name}'? El archivo .conf se borrará.").format(name=path.stem),
         )
-        dlg.add_response("cancel", "Cancelar")
-        dlg.add_response("delete", "Eliminar")
+        dlg.add_response("cancel", _("Cancelar"))
+        dlg.add_response("delete", _("Eliminar"))
         dlg.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dlg.set_default_response("cancel")
         dlg.set_close_response("cancel")
@@ -317,7 +318,7 @@ class ProfilesPage(Gtk.Box):
         def on_response(d, response):
             if response == "delete":
                 profile_store.delete_profile(path)
-                self.window.toast(f"Perfil '{path.stem}' eliminado")
+                self.window.toast(_("Perfil '{name}' eliminado").format(name=path.stem))
                 if self.window.current_profile == path:
                     self.window.set_current_profile(None)
                 self.refresh()

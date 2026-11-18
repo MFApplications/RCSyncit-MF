@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import shutil
+import threading
 from pathlib import Path
 
 from ..config import PROFILES_DIR, ensure_dirs
+from ..i18n import _
+
+_META_LOCK = threading.RLock()
+_PASSWORD_LOCK = threading.RLock()
 
 
 def list_profiles() -> list[Path]:
@@ -19,7 +25,7 @@ def create_profile(name: str) -> Path:
     ensure_dirs()
     safe = name.strip()
     if not safe or "/" in safe or safe.startswith("."):
-        raise ValueError("invalid profile name")
+        raise ValueError(_("invalid profile name"))
     if not safe.endswith(".conf"):
         safe = safe + ".conf"
     path = PROFILES_DIR / safe
@@ -32,6 +38,12 @@ def create_profile(name: str) -> Path:
 def delete_profile(path: Path) -> None:
     path.unlink(missing_ok=True)
     meta_path(path).unlink(missing_ok=True)
+    try:
+        from . import mount_manager
+
+        mount_manager._invalidate_profile_dump_cache(path)
+    except Exception:
+        pass
 
 
 def import_profile(src: Path) -> Path:
@@ -56,6 +68,12 @@ def import_profile_unique(src: Path) -> Path:
             i += 1
         candidate = PROFILES_DIR / f"{base}-{i}.conf"
     shutil.copyfile(src, candidate)
+    try:
+        from . import mount_manager
+
+        mount_manager._invalidate_profile_dump_cache()
+    except Exception:
+        pass
     return candidate
 
 
@@ -69,12 +87,28 @@ def detect_default_config() -> Path | None:
 
 def rename_profile(path: Path, new_name: str) -> Path:
     ensure_dirs()
-    if not new_name.endswith(".conf"):
-        new_name = new_name + ".conf"
-    dst = PROFILES_DIR / new_name
+    safe = new_name.strip()
+    if not safe or "/" in safe or safe.startswith("."):
+        raise ValueError(_("invalid profile name"))
+    if not safe.endswith(".conf"):
+        safe = safe + ".conf"
+    dst = PROFILES_DIR / safe
     if dst.exists() and dst != path:
-        raise FileExistsError(new_name)
+        raise FileExistsError(safe)
     path.rename(dst)
+    try:
+        from . import mount_manager
+
+        mount_manager._invalidate_profile_dump_cache(path)
+        mount_manager._invalidate_profile_dump_cache(dst)
+    except Exception:
+        pass
+    # Migrate metadata alongside the profile.
+    old_meta = meta_path(path)
+    new_meta = meta_path(dst)
+    if old_meta.exists() and not new_meta.exists():
+        with contextlib.suppress(OSError):
+            old_meta.rename(new_meta)
     return dst
 
 
@@ -95,7 +129,7 @@ def _legacy_meta_path(path: Path) -> Path:
     return path.with_suffix(".meta.json")
 
 
-def load_meta(path: Path) -> dict:
+def _load_meta_unlocked(path: Path) -> dict:
     mp = meta_path(path)
     legacy = _legacy_meta_path(path)
     # one-shot migration from JSON
@@ -121,8 +155,13 @@ def load_meta(path: Path) -> dict:
     return {}
 
 
-def save_meta(path: Path, meta: dict) -> None:
+def _save_meta_unlocked(path: Path, meta: dict) -> None:
     save_toml(meta_path(path), meta)
+
+
+def save_meta(path: Path, meta: dict) -> None:
+    with _META_LOCK:
+        _save_meta_unlocked(path, meta)
 
 
 def is_encrypted(path: Path) -> bool:
@@ -159,18 +198,21 @@ _PASSWORD_CACHE: dict[str, str] = {}
 
 
 def cache_password(path: Path, password: str) -> None:
-    _PASSWORD_CACHE[str(path)] = password
+    with _PASSWORD_LOCK:
+        _PASSWORD_CACHE[str(path)] = password
     meta = load_meta(path)
     meta["encrypted"] = True
     save_meta(path, meta)
 
 
 def get_cached_password(path: Path) -> str | None:
-    return _PASSWORD_CACHE.get(str(path))
+    with _PASSWORD_LOCK:
+        return _PASSWORD_CACHE.get(str(path))
 
 
 def clear_cached_password(path: Path) -> None:
-    _PASSWORD_CACHE.pop(str(path), None)
+    with _PASSWORD_LOCK:
+        _PASSWORD_CACHE.pop(str(path), None)
 
     meta = load_meta(path)
     meta["encrypted"] = False
@@ -186,3 +228,8 @@ def encrypted_flag(path: Path) -> bool | None:
     if "encrypted" in meta:
         return bool(meta["encrypted"])
     return None
+
+
+def load_meta(path: Path) -> dict:
+    with _META_LOCK:
+        return _load_meta_unlocked(path)

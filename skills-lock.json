@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "skills": {
+    "create-github-action-workflow-specification": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/create-github-action-workflow-specification/SKILL.md",
+      "computedHash": "df127912e6985e328bb396bba8fa6944e0770ab8e644e9d4b5b24fe30a093dbf"
+    },
+    "git-flow-branch-creator": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/git-flow-branch-creator/SKILL.md",
+      "computedHash": "dea69823bedd7be090328a01c60ecebf58d925e54ef43faf365e5c82246dfebd"
+    },
+    "python-quality": {
+      "source": "claude-dev-suite/claude-dev-suite",
+      "sourceType": "github",
+      "skillPath": "skills/best-practices/python-quality/SKILL.md",
+      "computedHash": "4b6ede876bb09dd869eea6e5cdf2ee3f3f9f3165298e412d28c2e88c009415ac"
+    },
+    "stop-slop": {
+      "source": "hardikpandya/stop-slop",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "02a5b429945020ed8a5ed4024d57384258c2596f09ab42c3e7498a8a43ec1c36"
+    }
+  }
+}

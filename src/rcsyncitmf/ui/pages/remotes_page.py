@@ -11,6 +11,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gtk
 
+from ...i18n import _
 from ...services import mount_manager, profile_store, rclone
 from ...ui.async_helper import run_async
 
@@ -29,14 +30,14 @@ class RemotesPage(Gtk.Box):
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         header.set_margin_bottom(6)
 
-        title = Gtk.Label(label="Remotos", xalign=0)
+        title = Gtk.Label(label=_("Remotos"), xalign=0)
         title.add_css_class("title-2")
         header.append(title)
 
         spacer = Gtk.Box(hexpand=True)
         header.append(spacer)
 
-        self.btn_refresh = Gtk.Button(label="Actualizar")
+        self.btn_refresh = Gtk.Button(label=_("Actualizar"))
         self.btn_refresh.connect("clicked", lambda _b: self.refresh())
         header.append(self.btn_refresh)
 
@@ -50,8 +51,8 @@ class RemotesPage(Gtk.Box):
         scrolled.set_child(self.list_box)
 
         self.status = Adw.StatusPage(
-            title="Sin perfiles",
-            description="Crea o importa un perfil en la sección Perfiles.",
+            title=_("Sin perfiles"),
+            description=_("Crea o importa un perfil en la sección Perfiles."),
             icon_name="folder-remote-symbolic",
         )
         self.stack = Gtk.Stack(vexpand=True)
@@ -76,7 +77,7 @@ class RemotesPage(Gtk.Box):
 
         profiles = profile_store.list_profiles()
         if not profiles:
-            self.status.set_title("Sin perfiles")
+            self.status.set_title(_("Sin perfiles"))
             self.status.set_description("Crea o importa un perfil en la sección Perfiles.")
             self.stack.set_visible_child_name("empty")
             return
@@ -116,8 +117,8 @@ class RemotesPage(Gtk.Box):
             expander._loaded = True
             if not isinstance(dump, dict) or not dump:
                 empty = Adw.ActionRow()
-                empty.set_title("Sin remotos")
-                empty.set_subtitle("Este perfil no tiene remotos.")
+                empty.set_title(_("Sin remotos"))
+                empty.set_subtitle(_("Este perfil no tiene remotos."))
                 expander.add_row(empty)
                 return
             # crypt map: parent -> crypt name
@@ -140,8 +141,8 @@ class RemotesPage(Gtk.Box):
                 visible.append(name)
             if not visible:
                 empty = Adw.ActionRow()
-                empty.set_title("Sin remotos")
-                empty.set_subtitle("Este perfil solo tiene unions (ver sección Unions).")
+                empty.set_title(_("Sin remotos"))
+                empty.set_subtitle(_("Este perfil solo tiene unions (ver sección Unions)."))
                 expander.add_row(empty)
                 return
             for name in sorted(visible):
@@ -156,14 +157,15 @@ class RemotesPage(Gtk.Box):
                 mp = mount_manager.default_mountpoint(
                     profile, str(mount_name) if mount_name is not None else name
                 )
-                initially_mounted = mp.exists() and __import__("os").path.ismount(str(mp))
+                initially_mounted = mount_manager.is_mounted(mp)
                 btn = Gtk.Button(
                     label=(
-                        "Desmontar"
+                        _(_("Desmontar"))
                         if initially_mounted
-                        else ("Montar (crypt)" if name in crypt_map else "Montar")
+                        else (_("Montar (crypt)") if name in crypt_map else _(_("Montar")))
                     )
                 )
+                btn.add_css_class("compact-btn")
                 if initially_mounted:
                     btn.add_css_class("destructive-action")
                 else:
@@ -179,21 +181,19 @@ class RemotesPage(Gtk.Box):
             expander._loading = False
             expander._loaded = True
             row = Adw.ActionRow()
-            row.set_title("Error")
+            row.set_title(_("Error"))
             row.set_subtitle(str(exc))
             expander.add_row(row)
 
         run_async(fetch(), on_success=ok, on_error=err)
 
     def _toggle_mount(self, profile: Path, name: str, btn: Gtk.Button, mp: Path) -> None:
-        import os
-
-        mounted = mp.exists() and os.path.ismount(str(mp))
+        mounted = mount_manager.is_mounted(mp)
         if not mounted:
             # show loading
             btn.set_sensitive(False)
             prev_label = btn.get_label()
-            btn.set_label("Montando...")
+            btn.set_label(_("Montando..."))
             # keep button label; spinner as tooltip not added to avoid layout changes
 
             async def do_mount():
@@ -202,24 +202,24 @@ class RemotesPage(Gtk.Box):
 
             def ok_mount(_mp):
                 btn.set_sensitive(True)
-                btn.set_label("Desmontar")
+                btn.set_label(_(_("Desmontar")))
                 btn.remove_css_class("suggested-action")
                 btn.add_css_class("destructive-action")
-                self.window.toast(f"Montado en {mp}")
+                self.window.toast(_("Montado en {mp}").format(mp=mp))
                 try:
                     mount_manager.open_in_file_manager(mp)
                 except Exception as exc:
-                    self.window.toast(f"Error abriendo: {exc}")
+                    self.window.toast(_("Error abriendo: {exc}").format(exc=exc))
 
             def err_mount(exc):
                 btn.set_sensitive(True)
                 btn.set_label(prev_label)
-                self.window.toast(f"Error montando '{name}': {exc}")
+                self.window.toast(_("Error montando '{name}': {exc}").format(name=name, exc=exc))
 
             run_async(do_mount(), on_success=ok_mount, on_error=err_mount)
         else:
             btn.set_sensitive(False)
-            btn.set_label("Desmontando...")
+            btn.set_label(_("Desmontando..."))
 
             async def do_unmount():
                 await mount_manager.unmount(mp)
@@ -227,14 +227,14 @@ class RemotesPage(Gtk.Box):
 
             def ok_unmount(_mp):
                 btn.set_sensitive(True)
-                btn.set_label("Montar")
+                btn.set_label(_("Montar"))
                 btn.remove_css_class("destructive-action")
                 btn.add_css_class("suggested-action")
-                self.window.toast(f"Desmontado {name}")
+                self.window.toast(_("Desmontado {name}").format(name=name))
 
             def err_unmount(exc):
                 btn.set_sensitive(True)
-                btn.set_label("Desmontar")
-                self.window.toast(f"Error desmontando '{name}': {exc}")
+                btn.set_label(_(_("Desmontar")))
+                self.window.toast(_("Error desmontando '{name}': {exc}").format(name=name, exc=exc))
 
             run_async(do_unmount(), on_success=ok_unmount, on_error=err_unmount)

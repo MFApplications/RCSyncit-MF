@@ -1,22 +1,32 @@
 # RCSyncitMF
 
-Gestor GNOME (libadwaita) para **rclone** con soporte de múltiples archivos de configuración (perfiles), remotos, unions y mounts, incluyendo sincronización de la estructura de directorios entre los upstreams de un union.
+GNOME (libadwaita) manager for **rclone** with support for multiple configuration files (profiles), remotes, unions, and mounts, including synchronization of the directory structure between a union's upstreams.
 
-## Requisitos
+## Features
+
+- **Profiles**: create, import, rename, and delete rclone `.conf` files.
+- **Remotes**: create/edit/delete remotes (local, drive, s3, dropbox, onedrive, union, etc.) and test connections.
+- **Unions**: create unions by selecting upstreams; sync folders between upstreams (dry-run by default).
+- **Mounts**: mount/unmount remotes with `rclone mount --daemon`, with configurable VFS options.
+- **Settings**: concurrency, depth, rclone binary, language, auto-sync interval.
+- **Theme**: automatic light/dark theme (libadwaita).
+- **Flatpak**: sandboxed execution using the host's `rclone` via `flatpak-spawn`.
+
+## Requirements
 
 - Python >= 3.11
 - PyGObject (GTK 4 + libadwaita)
 - rclone >= 1.60
-- (Para mounts) FUSE (`/dev/fuse`) y `fusermount`
+- (For mounts) FUSE (`/dev/fuse`) and `fusermount`/`fusermount3`
 
-## Instalación (desarrollo)
+## Installation (development)
 
 ```bash
 python -m pip install -e .
 rcsyncitmf
 ```
 
-## Instalación como app de escritorio
+## Installation as a desktop app
 
 ```bash
 ./install.sh
@@ -29,48 +39,58 @@ flatpak-builder --user --install --force-clean build com.rcsyncitmf.app.yml
 flatpak run com.rcsyncitmf.app
 ```
 
-## Uso
+The app uses the host's `rclone`. Make sure it is installed and available in `PATH`.
 
-1. **Perfiles**: crea o importa archivos `.conf` de rclone en `~/.config/rcsyncitmf/profiles/`.
-2. **Remotos**: dentro de un perfil, crea/edita/borra remotos (soporta local, drive, s3, dropbox, onedrive, union, etc.).
-3. **Unions**: crea un union seleccionando upstreams; usa "Sincronizar carpetas" para propagar creación/borrado de directorios entre upstreams (dry-run por defecto).
-4. **Mounts**: monta un remoto con `rclone mount --daemon`; desmonta con `fusermount -u`.
-5. **Ajustes**: concurrencia, modo (unión/intersección), profundidad, dry-run por defecto.
+### Recommended Flatseal permissions
 
-## Instalación como aplicación de escritorio
+| Permission | Why | Where to enable |
+|---|---|---|
+| Network | rclone accesses clouds/HTTP | Network → Access network |
+| Home folder | Profiles, config, mounts, and cache live in `~` | Filesystem → Home folder |
+| All devices | Access to `/dev/fuse` for mounts | Device → All devices |
+| D-Bus `org.freedesktop.Flatpak` | `flatpak-spawn --host` to run rclone/fusermount | (Advanced) Talk to D-Bus / Flatpak portal |
+| XDG config/cache (optional) | Extra access to `~/.config` and `~/.cache` | Filesystem → xdg-config, xdg-cache |
 
-```bash
-mkdir -p ~/.local/share/applications ~/.local/share/icons/hicolor/scalable/apps
-cp data/com.rcsyncitmf.app.desktop ~/.local/share/applications/
-cp data/icons/com.rcsyncitmf.app.svg ~/.local/share/icons/hicolor/scalable/apps/
-update-desktop-database ~/.local/share/applications/
-```
+**Host prerequisites (Flatpak):**
+- `rclone` installed.
+- FUSE available (`/dev/fuse`, `fusermount`/`fusermount3`).
+- Mount points are created under `~/.local/share/rcsyncitmf/mnt`.
 
-(El `.desktop` y el icono se añadirán en la fase de packaging.)
+## Quick start
 
-## Estructura
+1. **Profiles**: create or import rclone `.conf` files.
+2. **Remotes**: create/edit/delete remotes within a profile.
+3. **Unions**: create a union by selecting upstreams; use “Sync folders” (dry-run by default).
+4. **Mounts**: mount a remote with `rclone mount --daemon`; unmount with `fusermount -u`.
+5. **Settings**: concurrency, mode, depth, default dry-run, rclone binary, language.
+
+## Project structure
 
 ```
 src/rcsyncitmf/
   application.py   # Adw.Application
-  window.py        # ventana principal (sidebar + stack)
-  config.py        # rutas XDG y settings TOML
+  window.py        # main window (sidebar + stack)
+  config.py        # XDG paths and TOML settings
   services/        # rclone wrapper, profiles, union sync, mounts
-  ui/pages/        # perfiles, remotos, unions, mounts, ajustes
+  ui/pages/        # profiles, remotes, unions, mounts, settings
   ui/dialogs/      # remote, union
   resources/       # CSS
+  locales/         # i18n JSON
 ```
 
-## QA manual
+## Development
 
-- [ ] Crear/importar/eliminar perfil
-- [ ] Crear/editar/borrar remoto (local y un cloud)
-- [ ] Test connection en remoto
-- [ ] Crear union y sincronizar carpetas (dry-run + apply)
-- [ ] Montar/desmontar remoto
-- [ ] Cambiar ajustes y verificar persistencia
-- [ ] Verificar claro/oscuro del sistema
+```bash
+python -m pip install -e ".[dev]"
+ruff check src tests
+mypy src/rcsyncitmf
+pytest -q
+```
 
-## Licencia
+## Releases
 
-GPL-3.0-or-later (propuesta).
+Releases are generated automatically with **semantic-release** from conventional commits (`feat:`, `fix:`, `BREAKING CHANGE:`) pushed to `main`.
+
+## License
+
+GPL-3.0-or-later.

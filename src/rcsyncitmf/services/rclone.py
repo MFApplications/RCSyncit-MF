@@ -9,17 +9,22 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 from pathlib import Path
 
 __all__ = [
     "RcloneError",
     "config_dump",
+    "copy",
     "create_remote",
+    "delete_file",
     "delete_remote",
     "list_dirs",
+    "list_files",
     "list_remotes",
     "mkdir",
+    "move",
     "purge",
     "rclone_bin",
     "rmdir",
@@ -35,6 +40,11 @@ class RcloneError(Exception):
         self.stderr = stderr
 
 
+def in_flatpak() -> bool:
+    """Return True when running inside a Flatpak sandbox."""
+    return os.path.exists("/.flatpak-info") or bool(os.environ.get("FLATPAK_ID"))
+
+
 async def run(
     args: list[str],
     *,
@@ -46,7 +56,7 @@ async def run(
     """Run rclone with the given args. Returns stdout. Raises RcloneError on failure."""
     last_err: RcloneError | None = None
     for attempt in range(retries + 1):
-        cmd = [rclone_bin()]
+        cmd = ["flatpak-spawn", "--host", "rclone"] if in_flatpak() else [rclone_bin()]
         if config is not None:
             cmd += ["--config", str(config)]
         cmd += list(args)
@@ -164,6 +174,50 @@ async def list_dirs(
     return []
 
 
+async def list_files(
+    config: Path, remote: str, path: str = "", *, recursive: bool = False
+) -> list[dict]:
+    target = f"{remote}:{path}" if path else f"{remote}:"
+    args = ["lsjson", target]
+    if recursive:
+        args.append("-R")
+    out = await run(args, config=config)
+    if not out.strip():
+        return []
+    data = json.loads(out)
+    if isinstance(data, list):
+        return data
+    return []
+
+
+async def delete_file(config: Path, remote: str, path: str) -> None:
+    await run(["deletefile", f"{remote}:{path}"], config=config)
+
+
+async def move(
+    config: Path,
+    src_remote: str,
+    src_path: str,
+    dst_remote: str,
+    dst_path: str,
+) -> None:
+    src = f"{src_remote}:{src_path}" if src_path else f"{src_remote}:"
+    dst = f"{dst_remote}:{dst_path}" if dst_path else f"{dst_remote}:"
+    await run(["moveto", src, dst], config=config)
+
+
+async def copy(
+    config: Path,
+    src_remote: str,
+    src_path: str,
+    dst_remote: str,
+    dst_path: str,
+) -> None:
+    src = f"{src_remote}:{src_path}" if src_path else f"{src_remote}:"
+    dst = f"{dst_remote}:{dst_path}" if dst_path else f"{dst_remote}:"
+    await run(["copyto", src, dst], config=config)
+
+
 async def mkdir(config: Path, remote: str, path: str) -> None:
     await run(["mkdir", f"{remote}:{path}"], config=config)
 
@@ -182,8 +236,12 @@ def list_providers() -> list[dict]:
     import subprocess as _subprocess
 
     try:
+        if in_flatpak():
+            cmd = ["flatpak-spawn", "--host", "rclone", "config", "providers"]
+        else:
+            cmd = [rclone_bin(), "config", "providers"]
         proc = _subprocess.run(
-            [rclone_bin(), "config", "providers"],
+            cmd,
             capture_output=True,
             text=True,
             timeout=30,
@@ -197,7 +255,18 @@ def list_providers() -> list[dict]:
     return []
 
 
+_RCLONE_BIN_CACHE: dict[str, str] = {}
+
+def invalidate_rclone_bin_cache() -> None:
+    """Clear the cached rclone binary resolution (call after settings change)."""
+    _RCLONE_BIN_CACHE.clear()
+
+
+
+
 def rclone_bin() -> str:
+    if in_flatpak():
+        return "rclone"
     name = "rclone"
     try:
         from ..config import load_settings
@@ -205,4 +274,9 @@ def rclone_bin() -> str:
         name = str(load_settings().get("rclone_bin", "rclone") or "rclone")
     except Exception:
         name = "rclone"
-    return shutil.which(name) or name
+    cached = _RCLONE_BIN_CACHE.get(name)
+    if cached is not None:
+        return cached
+    resolved = shutil.which(name) or name
+    _RCLONE_BIN_CACHE[name] = resolved
+    return resolved

@@ -16,12 +16,15 @@ Two modes are supported:
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import re
 import shlex
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .rclone import list_dirs, mkdir, purge, rmdir
+from ..i18n import _
+from .rclone import config_dump, list_dirs, mkdir, purge, rmdir, update_remote
 
 
 @dataclass
@@ -89,7 +92,7 @@ async def build_plan(
         try:
             dirs = await list_dirs(config, _remote_of(u), _path_of(u), recursive=recursive)
         except Exception as exc:
-            plan.errors.append(f"list {u}: {exc}")
+            plan.errors.append(_("list {u}: {exc}").format(u=u, exc=exc))
             per[u] = set()
             continue
         paths = {d.get("Path", "") for d in dirs if d.get("Path")}
@@ -139,17 +142,24 @@ async def build_mirror_plan(
 
     per: dict[str, set[str]] = {}
     had_error = False
-    for u in ups:
+
+    async def _list_one(u: str) -> tuple[str, set[str] | None, Exception | None]:
         try:
             dirs = await list_dirs(config, _remote_of(u), _path_of(u), recursive=True)
         except Exception as exc:
-            plan.errors.append(f"list {u}: {exc}")
-            per[u] = set()
-            had_error = True
-            continue
+            return u, None, exc
         paths = {_collapse(d.get("Path", ""), depth) for d in dirs if d.get("Path")}
         paths.discard("")
-        per[u] = paths
+        return u, paths, None
+
+    results = await asyncio.gather(*[_list_one(u) for u in ups], return_exceptions=False)
+    for u, paths, exc in results:
+        if exc is not None:
+            plan.errors.append(_("list {u}: {exc}").format(u=u, exc=exc))
+            per[u] = set()
+            had_error = True
+        else:
+            per[u] = paths or set()
 
     if not ups:
         return plan
@@ -183,8 +193,9 @@ async def build_mirror_plan(
     delete_estimate = sum(sum(1 for u in ups if p in per.get(u, set())) for p in deleted_paths)
     if allow_delete and delete_estimate > max_deletions:
         plan.errors.append(
-            f"demasiados borrados ({delete_estimate} > {max_deletions}); "
-            "borrados omitidos por seguridad"
+            _("demasiados borrados ({n} > {m}); borrados omitidos por seguridad").format(
+                n=delete_estimate, m=max_deletions
+            )
         )
         deleted_paths = set()
         allow_delete = False
@@ -236,7 +247,7 @@ async def apply_plan(
             try:
                 await mkdir(config, _remote_of(u), _join(_path_of(u), p))
             except Exception as exc:
-                errors.append(f"mkdir {u}:{p}: {exc}")
+                errors.append(_("mkdir {u}:{p}: {exc}").format(u=u, p=p, exc=exc))
 
     async def do_delete(u: str, p: str) -> None:
         async with sem:
@@ -244,11 +255,65 @@ async def apply_plan(
                 if use_purge:
                     await purge(config, _remote_of(u), _join(_path_of(u), p))
                 else:
-                    await rmdir(config, _remote_of(u), _join(_path_of(u), p))
+                    try:
+                        await rmdir(config, _remote_of(u), _join(_path_of(u), p))
+                    except Exception as exc:
+                        low = str(exc).lower()
+                        if "not empty" in low or "directory not empty" in low:
+                            await purge(config, _remote_of(u), _join(_path_of(u), p))
+                        else:
+                            raise
             except Exception as exc:
-                errors.append(f"delete {u}:{p}: {exc}")
+                errors.append(_("delete {u}:{p}: {exc}").format(u=u, p=p, exc=exc))
 
-    await asyncio.gather(*[do_create(u, p) for u, p in creates])
+    # Process in bounded batches to limit memory pressure on huge trees.
+    batch = max(concurrency * 4, 32)
+
+    async def _run_batch(items, fn):
+        for i in range(0, len(items), batch):
+            chunk = items[i : i + batch]
+            await asyncio.gather(*[fn(u, p) for u, p in chunk])
+
+    await _run_batch(creates, do_create)
     if delete:
-        await asyncio.gather(*[do_delete(u, p) for u, p in deletes])
+        await _run_batch(deletes, do_delete)
     return errors
+
+
+def _parse_cache_time(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    raw = str(value).strip().lower()
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+    total = 0
+    for num, unit in re.findall(r"(\d+)\s*([smh])", raw):
+        n = int(num)
+        if unit == "s":
+            total += n
+        elif unit == "m":
+            total += n * 60
+        elif unit == "h":
+            total += n * 3600
+    return total if total > 0 else 300
+
+
+async def normalize_union_cache_times(config, config_password=None) -> None:
+    """Repair unions whose ``cache_time`` is stored as a non-integer (e.g. '5m')."""
+    try:
+        dump = await config_dump(config, config_password=config_password)
+    except Exception:
+        return
+    if not isinstance(dump, dict):
+        return
+    for name, data in list(dump.items()):
+        if not (isinstance(data, dict) and data.get("type") == "union"):
+            continue
+        ct = data.get("cache_time", None)
+        if isinstance(ct, int):
+            continue
+        seconds = _parse_cache_time(ct)
+        with contextlib.suppress(Exception):
+            await update_remote(config, name, {"cache_time": seconds})

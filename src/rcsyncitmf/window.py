@@ -12,6 +12,8 @@ from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gtk
 
+from .i18n import _
+from .ui.pages.files_page import FilesPage
 from .ui.pages.mounts_page import MountsPage
 from .ui.pages.profiles_page import ProfilesPage
 from .ui.pages.remotes_page import RemotesPage
@@ -45,23 +47,22 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Headerbar (top): title (left) + window buttons (right)
         header = Adw.HeaderBar()
-        self.title_label = Gtk.Label(label="Perfiles", xalign=0)
-        self.title_label.add_css_class("title")
-        header.pack_start(self.title_label)
         toolbar_view.add_top_bar(header)
 
         # Content stack
         self.stack = Adw.ViewStack()
 
         self.profiles_page = ProfilesPage(self)
+        self.files_page = FilesPage(self)
         self.remotes_page = RemotesPage(self)
         self.unions_page = UnionsPage(self)
         self.mounts_page = MountsPage(self)
         self.settings_page = SettingsPage(self)
-        self.stack.add_titled(self.profiles_page, "profiles", "Perfiles")
-        self.stack.add_titled(self.remotes_page, "remotes", "Remotos")
-        self.stack.add_titled(self.unions_page, "unions", "Unions")
-        self.stack.add_titled(self.mounts_page, "mounts", "Mounts")
+        self.stack.add_titled(self.profiles_page, "profiles", _("Perfiles"))
+        self.stack.add_titled(self.files_page, "files", _("Archivos"))
+        self.stack.add_titled(self.remotes_page, "remotes", _("Remotos"))
+        self.stack.add_titled(self.unions_page, "unions", _("Unions"))
+        self.stack.add_titled(self.mounts_page, "mounts", _("Mounts"))
         self.stack.add_titled(self.settings_page, "settings", "Ajustes")
 
         # Drag & drop: import .conf files
@@ -77,54 +78,21 @@ class MainWindow(Adw.ApplicationWindow):
         sidebar_box.set_margin_start(8)
         sidebar_box.set_margin_end(8)
 
-        # Top row: hamburger menu
-        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        top_row.set_halign(Gtk.Align.START)
-
-        menu_btn = Gtk.MenuButton()
-        menu_btn.set_icon_name("open-menu-symbolic")
-        menu_btn.set_tooltip_text("Menú")
-        popover = Gtk.Popover()
-        menu_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        menu_box.set_margin_top(6)
-        menu_box.set_margin_bottom(6)
-        menu_box.set_margin_start(6)
-        menu_box.set_margin_end(6)
-
-        def make_menu_item(label: str, callback) -> Gtk.Button:
-            b = Gtk.Button(label=label)
-            b.add_css_class("flat")
-            b.set_halign(Gtk.Align.FILL)
-            b.connect("clicked", callback)
-            return b
-
-        menu_box.append(make_menu_item("Nuevo perfil", lambda _b: self._menu_new_profile()))
-        menu_box.append(
-            make_menu_item("Importar rclone.conf", lambda _b: self._menu_import_default())
-        )
-        menu_box.append(make_menu_item("Preferencias", lambda _b: self._menu_preferences()))
-        menu_box.append(make_menu_item("Atajos de teclado", lambda _b: self._menu_shortcuts()))
-        menu_box.append(make_menu_item("Acerca de", lambda _b: self._menu_about()))
-        popover.set_child(menu_box)
-        menu_btn.set_popover(popover)
-        top_row.append(menu_btn)
-
-        sidebar_box.append(top_row)
-
-        self.profile_label = Gtk.Label(label="Sin perfil activo", xalign=0)
-        self.profile_label.add_css_class("dim-label")
-        self.profile_label.add_css_class("caption")
-        sidebar_box.append(self.profile_label)
+        self.section_title_label = Gtk.Label(label=_("Perfiles"), xalign=0.5)
+        self.section_title_label.add_css_class("title-2")
+        self.section_title_label.set_margin_bottom(6)
+        sidebar_box.append(self.section_title_label)
 
         self.sidebar_list = Gtk.ListBox()
         self.sidebar_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self.sidebar_list.add_css_class("navigation-sidebar")
         sections = [
-            ("profiles", "Perfiles", "document-properties-symbolic"),
-            ("remotes", "Remotos", "network-server-symbolic"),
-            ("unions", "Unions", "folder-remote-symbolic"),
-            ("mounts", "Mounts", "drive-harddisk-symbolic"),
-            ("settings", "Ajustes", "preferences-system-symbolic"),
+            ("profiles", _("Perfiles"), "document-properties-symbolic"),
+            ("files", _("Archivos"), "folder-symbolic"),
+            ("remotes", _("Remotos"), "network-server-symbolic"),
+            ("unions", _("Unions"), "folder-remote-symbolic"),
+            ("mounts", _("Mounts"), "drive-harddisk-symbolic"),
+            ("settings", _("Ajustes"), "preferences-system-symbolic"),
         ]
         for key, label, icon in sections:
             row = Gtk.ListBoxRow()
@@ -154,7 +122,7 @@ class MainWindow(Adw.ApplicationWindow):
         window_handle = Gtk.WindowHandle()
         window_handle.set_child(sidebar_box)
 
-        sidebar_page = Adw.NavigationPage.new(window_handle, "Navegación")
+        sidebar_page = Adw.NavigationPage.new(window_handle, _("Navegación"))
 
         split = Adw.OverlaySplitView()
         split.set_sidebar(sidebar_page)
@@ -175,7 +143,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         controller.add_shortcut(shortcut_q)
         self.add_controller(controller)
-        _ = Gdk.Display.get_default()
+        _display = Gdk.Display.get_default()
 
     # --- Drag & drop handler ---
     def _on_drop(self, _target, value, _x, _y) -> bool:
@@ -196,23 +164,31 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _import_profile(self, src: Path) -> None:
-        import asyncio
-
         from .services import profile_store, rclone
+        from .ui.async_helper import run_async
 
-        dst = profile_store.import_profile_unique(src)
-        # Detect accounts/unions
         try:
-            loop = asyncio.new_event_loop()
-            dump = loop.run_until_complete(rclone.config_dump(dst))
-            loop.close()
+            dst = profile_store.import_profile_unique(src)
+        except Exception as exc:
+            self.toast(f"Error importando {src.name}: {exc}")
+            return
+
+        async def fetch():
+            return await rclone.config_dump(dst)
+
+        def on_success(dump):
             remotes = list(dump.keys()) if isinstance(dump, dict) else []
             unions = [
-                n for n, d in dump.items() if isinstance(d, dict) and d.get("type") == "union"
+                n
+                for n, d in (dump.items() if isinstance(dump, dict) else [])
+                if isinstance(d, dict) and d.get("type") == "union"
             ]
             self.toast(f"Importado {dst.name}: {len(remotes)} remotos, {len(unions)} unions")
-        except Exception:
+
+        def on_error(_exc):
             self.toast(f"Importado {dst.name}")
+
+        run_async(fetch(), on_success=on_success, on_error=on_error)
 
     # --- Default rclone.conf detection (called from application) ---
     def check_default_rclone_config(self) -> None:
@@ -252,23 +228,23 @@ class MainWindow(Adw.ApplicationWindow):
             self.stack.set_visible_child_name(key)
             if key == "mounts":
                 self.mounts_page.refresh()
-            # Update headerbar title
+            if key == "files":
+                self.files_page.refresh()
+            # Update sidebar section title
             labels = {
-                "profiles": "Perfiles",
-                "remotes": "Remotos",
-                "unions": "Unions",
-                "mounts": "Mounts",
-                "settings": "Ajustes",
+                "profiles": _("Perfiles"),
+                "files": _("Archivos"),
+                "remotes": _("Remotos"),
+                "unions": _("Unions"),
+                "mounts": _("Mounts"),
+                "settings": _("Ajustes"),
             }
-            self.title_label.set_text(labels.get(key, key))
+            self.section_title_label.set_text(labels.get(key, key))
 
     def set_current_profile(self, profile: Path | None) -> None:
         self.current_profile = profile
-        if profile is None:
-            self.profile_label.set_text("Sin perfil activo")
-        else:
-            self.profile_label.set_text(profile.stem)
         self.remotes_page.set_profile(profile)
+        self.files_page.set_profile(profile)
         self.unions_page.set_profile(profile)
         self.mounts_page.set_profile(profile)
         self.mounts_page.refresh()
@@ -280,11 +256,14 @@ class MainWindow(Adw.ApplicationWindow):
     def ask_profile_password(self, profile: Path, on_ok) -> None:
         from .services import profile_store
 
-        dlg = Adw.AlertDialog.new(f"Contraseña para {profile.stem}", "El perfil está encriptado.")
+        dlg = Adw.AlertDialog.new(
+            f"{_('Contraseña para')} {profile.stem}",
+            _("El perfil está encriptado."),
+        )
         entry = Gtk.Entry()
         entry.set_visibility(False)
         entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
-        entry.set_placeholder_text("contraseña")
+        entry.set_placeholder_text(_("contraseña"))
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.set_margin_top(8)
         box.set_margin_bottom(8)
@@ -292,8 +271,8 @@ class MainWindow(Adw.ApplicationWindow):
         box.set_margin_end(8)
         box.append(entry)
         dlg.set_extra_child(box)
-        dlg.add_response("cancel", "Cancelar")
-        dlg.add_response("ok", "Aceptar")
+        dlg.add_response("cancel", _("Cancelar"))
+        dlg.add_response("ok", _("Aceptar"))
         dlg.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("ok")
         dlg.set_close_response("cancel")
@@ -329,17 +308,28 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _menu_shortcuts(self) -> None:
         dlg = Adw.AlertDialog.new(
-            "Atajos de teclado",
-            "Ctrl+Q — Salir",
+            _("Atajos de teclado"),
+            _("Ctrl+Q — Salir"),
         )
-        dlg.add_response("ok", "OK")
+        dlg.add_response("ok", _("OK"))
         dlg.present(self)
 
     def _menu_about(self) -> None:
+        from pathlib import Path as _Path
+
         dlg = Adw.AboutDialog.new()
         dlg.set_application_name("RCSyncitMF")
-        dlg.set_application_icon("com.rcsyncitmf.app")
+        dlg.set_application_icon("io.github.MFApplications.RCSyncitMF")
+        _logo = _Path(__file__).resolve().parent / "resources" / "RCSyncitMF-logo.png"
+        if _logo.exists():
+            try:
+                from gi.repository import Gdk
+
+                texture = Gdk.Texture.new_from_filename(str(_logo))
+                dlg.set_logo(texture)
+            except Exception:
+                pass
         dlg.set_version("0.1.0")
         dlg.set_developer_name("RCSyncitMF")
-        dlg.set_comments("Gestor GNOME para rclone con multi-config y union sync.")
+        dlg.set_comments(_("Gestor GNOME para rclone con multi-config y union sync."))
         dlg.present(self)

@@ -12,6 +12,7 @@ from pathlib import Path
 from gi.repository import Adw, Gtk
 
 from ...config import load_settings
+from ...i18n import _
 from ...services import mount_manager, profile_store, rclone, sync_state, union_sync
 from ...ui.async_helper import run_async
 from ...ui.dialogs.union_dialog import UnionDialog
@@ -26,24 +27,6 @@ class UnionsPage(Gtk.Box):
         self._crypt_map: dict[str, str] = {}
         self.set_spacing(0)
 
-        # Options bar
-        opts = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        opts.set_margin_top(8)
-        opts.set_margin_bottom(4)
-        opts.set_margin_start(12)
-        opts.set_margin_end(12)
-
-        # Depth removed: always sync recursively.
-
-        self.purge_switch = Gtk.Switch()
-        self.purge_switch.set_active(False)
-        purge_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        purge_box.append(Gtk.Label(label="Purge (recursivo)"))
-        purge_box.append(self.purge_switch)
-        opts.append(purge_box)
-
-        self.append(opts)
-
         # Header
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         header.set_margin_top(4)
@@ -51,20 +34,20 @@ class UnionsPage(Gtk.Box):
         header.set_margin_start(12)
         header.set_margin_end(12)
 
-        title = Gtk.Label(label="Unions", xalign=0)
+        title = Gtk.Label(label=_("Unions"), xalign=0)
         title.add_css_class("title-2")
         header.append(title)
 
         spacer = Gtk.Box(hexpand=True)
         header.append(spacer)
 
-        self.btn_new = Gtk.Button(label="Nuevo union")
+        self.btn_new = Gtk.Button(label=_("Nuevo union"))
         self.btn_new.add_css_class("suggested-action")
         self.btn_new.connect("clicked", self._on_new)
         self.btn_new.set_sensitive(False)
         header.append(self.btn_new)
 
-        self.btn_refresh = Gtk.Button(label="Actualizar")
+        self.btn_refresh = Gtk.Button(label=_("Actualizar"))
         self.btn_refresh.connect("clicked", lambda _b: self.refresh())
         self.btn_refresh.set_sensitive(False)
         header.append(self.btn_refresh)
@@ -80,8 +63,8 @@ class UnionsPage(Gtk.Box):
         scrolled.set_child(self.list_box)
 
         self.status = Adw.StatusPage(
-            title="Sin perfil",
-            description="Selecciona un perfil en Perfiles.",
+            title=_("Sin perfil"),
+            description=_("Selecciona un perfil en Perfiles."),
             icon_name="folder-remote-symbolic",
         )
 
@@ -97,8 +80,8 @@ class UnionsPage(Gtk.Box):
         self.profile = profile
         if profile is None:
             self.stack.set_visible_child_name("empty")
-            self.status.set_title("Sin perfil")
-            self.status.set_description("Selecciona un perfil en Perfiles.")
+            self.status.set_title(_("Sin perfil"))
+            self.status.set_description(_("Selecciona un perfil en Perfiles."))
             self.btn_new.set_sensitive(False)
             self.btn_refresh.set_sensitive(False)
             return
@@ -130,6 +113,7 @@ class UnionsPage(Gtk.Box):
                 if self.profile is not None
                 else None
             )
+            await union_sync.normalize_union_cache_times(self._profile, config_password=pwd)
             dump = await rclone.config_dump(self._profile, config_password=pwd)
             return dump
 
@@ -148,8 +132,8 @@ class UnionsPage(Gtk.Box):
                 if isinstance(data, dict) and data.get("type") == "union":
                     self.unions.append({"name": name, "data": data})
             if not self.unions:
-                self.status.set_title("Sin unions")
-                self.status.set_description("Crea un union con el botón 'Nuevo union'.")
+                self.status.set_title(_("Sin unions"))
+                self.status.set_description(_("Crea un union con el botón 'Nuevo union'."))
                 self.stack.set_visible_child_name("empty")
                 return
             self.stack.set_visible_child_name("list")
@@ -157,7 +141,7 @@ class UnionsPage(Gtk.Box):
                 self._add_union_row(u)
 
         def on_error(exc):
-            self.window.toast(f"Error cargando unions: {exc}")
+            self.window.toast(_("Error cargando unions: {exc}").format(exc=exc))
 
         run_async(fetch(), on_success=on_success, on_error=on_error)
 
@@ -174,11 +158,12 @@ class UnionsPage(Gtk.Box):
         top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         icon = Gtk.Image.new_from_icon_name("folder-remote-symbolic")
         top.append(icon)
-        label = Gtk.Label(label=name, xalign=0, hexpand=True)
+        display_name = f"{self.profile.stem}: {name}" if self.profile is not None else name
+        label = Gtk.Label(label=display_name, xalign=0, hexpand=True)
         label.add_css_class("heading")
         top.append(label)
 
-        btn_sync = Gtk.Button(label="Sincronizar carpetas")
+        btn_sync = Gtk.Button(label=_("Sincronizar carpetas"))
         btn_sync.connect("clicked", lambda _b, n=name: self._on_sync(n))
         top.append(btn_sync)
 
@@ -187,14 +172,14 @@ class UnionsPage(Gtk.Box):
             if self.profile is not None
             else Path.home() / ".local" / "share" / "rcsyncitmf" / "mnt" / name
         )
-        initially_mounted = mp.exists() and __import__("os").path.ismount(str(mp))
+        initially_mounted = mount_manager.is_mounted(mp)
         btn_sync.set_sensitive(initially_mounted)
         btn_sync.set_tooltip_text(
-            "Disponible solo cuando el union está montado"
+            _("Disponible solo cuando el union está montado")
             if not initially_mounted
-            else "Sincronizar estructura de carpetas"
+            else _("Sincronizar estructura de carpetas")
         )
-        btn_mount = Gtk.Button(label=("Desmontar" if initially_mounted else "Montar"))
+        btn_mount = Gtk.Button(label=(_("Desmontar") if initially_mounted else _("Montar")))
         if initially_mounted:
             btn_mount.add_css_class("destructive-action")
         else:
@@ -212,7 +197,7 @@ class UnionsPage(Gtk.Box):
 
         box.append(top)
 
-        sub = Gtk.Label(label=f"upstreams: {upstreams}", xalign=0)
+        sub = Gtk.Label(label=_("upstreams: {u}").format(u=upstreams), xalign=0)
         sub.add_css_class("dim-label")
         sub.add_css_class("caption")
         sub.set_wrap(True)
@@ -220,20 +205,20 @@ class UnionsPage(Gtk.Box):
 
         crypt_name = self._crypt_map.get(name)
         if crypt_name:
-            csub = Gtk.Label(label=f"encriptado: {crypt_name}", xalign=0)
+            csub = Gtk.Label(label=_("encriptado: {n}").format(n=crypt_name), xalign=0)
             csub.add_css_class("dim-label")
             csub.add_css_class("caption")
             box.append(csub)
 
         action_policy = u["data"].get("action_policy", "?")
-        ap = Gtk.Label(label=f"action_policy: {action_policy}", xalign=0)
+        ap = Gtk.Label(label=_("action_policy: {a}").format(a=action_policy), xalign=0)
         ap.add_css_class("dim-label")
         ap.add_css_class("caption")
         box.append(ap)
 
         last = sync_state.last_sync(self._profile, name) if self.profile is not None else None
         if last:
-            sub2 = Gtk.Label(label=f"última sync: {last}", xalign=0)
+            sub2 = Gtk.Label(label=_("última sync: {l}").format(l=last), xalign=0)
             sub2.add_css_class("dim-label")
             sub2.add_css_class("caption")
             box.append(sub2)
@@ -258,16 +243,16 @@ class UnionsPage(Gtk.Box):
             dlg.present(self.window)
 
         def on_error(exc):
-            self.window.toast(f"Error: {exc}")
+            self.window.toast(_("Error: {exc}").format(exc=exc))
 
         run_async(fetch(), on_success=on_success, on_error=on_error)
 
     def _on_mount(self, _btn=None) -> None:
         if not self.unions:
-            self.window.toast("Sin unions")
+            self.window.toast(_("Sin unions"))
             return
         if len(self.unions) > 1:
-            self.window.toast("Monta el union desde Remotos (varios disponibles)")
+            self.window.toast(_("Monta el union desde Remotos (varios disponibles)"))
             return
         u = self.unions[0]
         name = u["name"]
@@ -289,17 +274,17 @@ class UnionsPage(Gtk.Box):
                 self.window.toast(f"Error abriendo: {exc}")
 
         def err(exc):
-            self.window.toast(f"Error montando '{name}': {exc}")
+            self.window.toast(_("Error montando '{name}': {exc}").format(name=name, exc=exc))
 
         run_async(do(), on_success=ok, on_error=err)
 
     def _on_explore(self, _btn=None) -> None:
         if not self.unions:
-            self.window.toast("Sin unions")
+            self.window.toast(_("Sin unions"))
             return
         name = self.unions[0]["name"]
         if self.profile is None:
-            self.window.toast("Selecciona un perfil")
+            self.window.toast(_("Selecciona un perfil"))
             return
 
         async def do():
@@ -336,9 +321,11 @@ class UnionsPage(Gtk.Box):
         run_async(do(), on_success=ok, on_error=err)
 
     def _on_delete(self, name: str) -> None:
-        dlg = Adw.AlertDialog.new("Eliminar union", f"¿Eliminar el union '{name}'?")
-        dlg.add_response("cancel", "Cancelar")
-        dlg.add_response("delete", "Eliminar")
+        dlg = Adw.AlertDialog.new(
+            _("Eliminar union"), _("¿Eliminar el union '{name}'?").format(name=name)
+        )
+        dlg.add_response("cancel", _("Cancelar"))
+        dlg.add_response("delete", _("Eliminar"))
         dlg.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dlg.set_default_response("cancel")
         dlg.set_close_response("cancel")
@@ -349,13 +336,19 @@ class UnionsPage(Gtk.Box):
                 async def do():
                     await rclone.delete_remote(self._profile, name)
 
-                def ok(_):
+                def ok(_result):
                     sync_state.delete_state(self._profile, name)
-                    self.window.toast(f"Union '{name}' eliminado")
+                    try:
+                        from ...services import mount_manager
+
+                        mount_manager._invalidate_profile_dump_cache(self._profile)
+                    except Exception:
+                        pass
+                    self.window.toast(_("Union '{name}' eliminado").format(name=name))
                     self.refresh()
 
                 def err(exc):
-                    self.window.toast(f"Error: {exc}")
+                    self.window.toast(_("Error: {exc}").format(exc=exc))
 
                 run_async(do(), on_success=ok, on_error=err)
             d.close() if hasattr(d, "close") else None
@@ -364,13 +357,11 @@ class UnionsPage(Gtk.Box):
         dlg.present(self.window)
 
     def _toggle_mount(self, profile: Path, name: str, btn: Gtk.Button, mp: Path) -> None:
-        import os
-
-        mounted = mp.exists() and os.path.ismount(str(mp))
+        mounted = mount_manager.is_mounted(mp)
         if not mounted:
             btn.set_sensitive(False)
             prev = btn.get_label()
-            btn.set_label("Montando...")
+            btn.set_label(_("Montando..."))
 
             async def do_mount():
                 await mount_manager.mount(profile, name, mp)
@@ -378,7 +369,7 @@ class UnionsPage(Gtk.Box):
 
             def ok_mount(_mp):
                 btn.set_sensitive(True)
-                btn.set_label("Desmontar")
+                btn.set_label(_("Desmontar"))
                 btn.remove_css_class("suggested-action")
                 btn.add_css_class("destructive-action")
                 self.window.toast(f"Montado en {mp}")
@@ -391,12 +382,12 @@ class UnionsPage(Gtk.Box):
             def err_mount(exc):
                 btn.set_sensitive(True)
                 btn.set_label(prev)
-                self.window.toast(f"Error montando '{name}': {exc}")
+                self.window.toast(_("Error montando '{name}': {exc}").format(name=name, exc=exc))
 
             run_async(do_mount(), on_success=ok_mount, on_error=err_mount)
         else:
             btn.set_sensitive(False)
-            btn.set_label("Desmontando...")
+            btn.set_label(_("Desmontando..."))
 
             async def do_unmount():
                 await mount_manager.unmount(mp)
@@ -404,16 +395,16 @@ class UnionsPage(Gtk.Box):
 
             def ok_unmount(_mp):
                 btn.set_sensitive(True)
-                btn.set_label("Montar")
+                btn.set_label(_("Montar"))
                 btn.remove_css_class("destructive-action")
                 btn.add_css_class("suggested-action")
-                self.window.toast(f"Desmontado {name}")
+                self.window.toast(_("Desmontado {name}").format(name=name))
                 self.refresh()
 
             def err_unmount(exc):
                 btn.set_sensitive(True)
-                btn.set_label("Desmontar")
-                self.window.toast(f"Error desmontando '{name}': {exc}")
+                btn.set_label(_("Desmontar"))
+                self.window.toast(_("Error desmontando '{name}': {exc}").format(name=name, exc=exc))
 
             run_async(do_unmount(), on_success=ok_unmount, on_error=err_unmount)
 
@@ -423,6 +414,8 @@ class UnionsPage(Gtk.Box):
         mode = "mirror"
         delete_enabled = False
         settings = load_settings()
+        raw_depth = int(settings.get("sync_depth", 0) or 0)
+        depth = None if raw_depth <= 0 else raw_depth
 
         async def fetch():
             from ...services import profile_store
@@ -449,8 +442,7 @@ class UnionsPage(Gtk.Box):
                 baseline=baseline,
                 previous_upstreams=previous,
                 allow_delete=delete_enabled,
-                max_deletions=int(settings.get("auto_sync_max_deletions", 100)),
-                depth=None,
+                depth=depth,
             )
             return ups, plan
 
@@ -459,14 +451,14 @@ class UnionsPage(Gtk.Box):
             self._show_preview(union_name, ups, plan, mode, delete_enabled)
 
         def on_error(exc):
-            self.window.toast(f"Error: {exc}")
+            self.window.toast(_("Error: {exc}").format(exc=exc))
 
         run_async(fetch(), on_success=on_success, on_error=on_error)
 
     def _show_preview(self, union_name, ups, plan, mode, delete_enabled: bool = False) -> None:
         delete_enabled = bool(delete_enabled)
 
-        dlg = Adw.AlertDialog.new("Vista previa de sincronización", "")
+        dlg = Adw.AlertDialog.new(_("Vista previa de sincronización"), "")
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         outer.set_margin_top(12)
         outer.set_margin_bottom(12)
@@ -474,9 +466,11 @@ class UnionsPage(Gtk.Box):
         outer.set_margin_end(12)
 
         summary = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        summary.append(Gtk.Label(label=f"Union: {union_name}", xalign=0))
-        summary.append(Gtk.Label(label=f"Upstreams: {', '.join(ups)}", xalign=0))
-        summary.append(Gtk.Label(label="Modo: espejo bidireccional (creación + borrado)", xalign=0))
+        summary.append(Gtk.Label(label=_("Union: {u}").format(u=union_name), xalign=0))
+        summary.append(Gtk.Label(label=_("Upstreams: {u}").format(u=", ".join(ups)), xalign=0))
+        summary.append(
+            Gtk.Label(label=_("Modo: sincronización de estructura (creaciones; borrados deshabilitados por seguridad)"), xalign=0)
+        )
         last = sync_state.last_sync(self._profile, union_name)
         if last:
             summary.append(Gtk.Label(label=f"Última sync: {last}", xalign=0))
@@ -495,7 +489,7 @@ class UnionsPage(Gtk.Box):
             header.add_css_class("heading")
             content.append(header)
             if not items:
-                empty = Gtk.Label(label="Sin operaciones", xalign=0)
+                empty = Gtk.Label(label=_("Sin operaciones"), xalign=0)
                 empty.add_css_class("dim-label")
                 empty.add_css_class("caption")
                 content.append(empty)
@@ -526,6 +520,24 @@ class UnionsPage(Gtk.Box):
                 lbl.set_wrap(True)
                 content.append(lbl)
 
+        # Purge option (recursive delete) chosen at apply time.
+        purge_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        purge_box.set_margin_top(8)
+        purge_label = Gtk.Label(label=_("Purge (borrado recursivo)"))
+        purge_box.append(purge_label)
+        purge_switch = Gtk.Switch()
+        purge_switch.set_active(False)
+        purge_switch.set_halign(Gtk.Align.END)
+        purge_box.append(purge_switch)
+        purge_help = Gtk.Label(
+            label=_("Activa para borrar directorios con contenido; desactivado solo borra vacíos."),
+            xalign=0,
+        )
+        purge_help.add_css_class("dim-label")
+        purge_help.add_css_class("caption")
+        outer.append(purge_box)
+        outer.append(purge_help)
+
         # Inform the user how deletions are handled.
         ap = None
         for u in self.unions:
@@ -551,15 +563,15 @@ class UnionsPage(Gtk.Box):
             outer.append(note)
 
         dlg.set_extra_child(outer)
-        dlg.add_response("cancel", "Cancelar")
-        dlg.add_response("apply", "Aplicar")
+        dlg.add_response("cancel", _("Cancelar"))
+        dlg.add_response("apply", _("Aplicar"))
         dlg.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("cancel")
         dlg.set_close_response("cancel")
 
         def on_response(d, response):
             if response == "apply":
-                purge = self.purge_switch.get_active()
+                purge = purge_switch.get_active()
                 settings = load_settings()
                 concurrency = int(settings.get("concurrency", 4))
 
@@ -575,15 +587,15 @@ class UnionsPage(Gtk.Box):
 
                 def ok(errs):
                     if errs:
-                        self.window.toast(f"Aplicado con {len(errs)} errores")
+                        self.window.toast(_("Aplicado con {n} errores").format(n=len(errs)))
                     else:
-                        self.window.toast("Sincronización aplicada")
+                        self.window.toast(_("Sincronización aplicada"))
                         if plan.baseline is not None:
                             sync_state.save_state(self._profile, union_name, ups, plan.baseline)
                     self.refresh()
 
                 def err(exc):
-                    self.window.toast(f"Error: {exc}")
+                    self.window.toast(_("Error: {exc}").format(exc=exc))
 
                 run_async(do(), on_success=ok, on_error=err)
             d.close() if hasattr(d, "close") else None

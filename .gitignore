@@ -56,5 +56,11 @@ ehthumbs.db
 Desktop.ini
 
 # Project-specific
-data/icons/
 *.bak
+
+# Packaging / Flatpak build artifacts
+.flatpak-builder/
+build-dir/
+*.flatpak
+*.flatpak.bundle
+*.AppImage

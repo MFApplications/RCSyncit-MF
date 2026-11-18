@@ -7,6 +7,7 @@ or overwrite each other's baseline.
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -15,12 +16,14 @@ from ..config import APP_DIR, ensure_dirs, load_toml, save_toml
 STATE_FILE = APP_DIR / "sync_state.toml"
 _LEGACY_STATE_FILE = APP_DIR / "sync_state.json"
 
+_STATE_LOCK = threading.RLock()
+
 
 def _key(profile: Path, union_name: str) -> str:
     return f"{Path(profile).resolve()!s}::{union_name}"
 
 
-def _load_all() -> dict:
+def _load_all_unlocked() -> dict:
     ensure_dirs()
     data = load_toml(STATE_FILE, legacy=_LEGACY_STATE_FILE)
     if not isinstance(data, dict):
@@ -30,9 +33,19 @@ def _load_all() -> dict:
     return data
 
 
-def _save_all(data: dict) -> None:
+def _save_all_unlocked(data: dict) -> None:
     ensure_dirs()
     save_toml(STATE_FILE, data)
+
+
+def _load_all() -> dict:
+    with _STATE_LOCK:
+        return _load_all_unlocked()
+
+
+def _save_all(data: dict) -> None:
+    with _STATE_LOCK:
+        _save_all_unlocked(data)
 
 
 def load_state(profile: Path, union_name: str) -> dict | None:
@@ -44,19 +57,21 @@ def load_state(profile: Path, union_name: str) -> dict | None:
 
 
 def save_state(profile: Path, union_name: str, upstreams: list[str], paths: set[str]) -> None:
-    data = _load_all()
-    data["states"][_key(profile, union_name)] = {
-        "upstreams": list(upstreams),
-        "paths": sorted(paths),
-        "last_sync": datetime.now().isoformat(timespec="seconds"),
-    }
-    _save_all(data)
+    with _STATE_LOCK:
+        data = _load_all_unlocked()
+        data["states"][_key(profile, union_name)] = {
+            "upstreams": list(upstreams),
+            "paths": sorted(paths),
+            "last_sync": datetime.now().isoformat(timespec="seconds"),
+        }
+        _save_all_unlocked(data)
 
 
 def delete_state(profile: Path, union_name: str) -> None:
-    data = _load_all()
-    data["states"].pop(_key(profile, union_name), None)
-    _save_all(data)
+    with _STATE_LOCK:
+        data = _load_all_unlocked()
+        data["states"].pop(_key(profile, union_name), None)
+        _save_all_unlocked(data)
 
 
 def last_sync(profile: Path, union_name: str) -> str | None:

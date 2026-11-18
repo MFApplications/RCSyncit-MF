@@ -19,6 +19,7 @@ from typing import Any
 
 from gi.repository import Adw, Gtk
 
+from ...i18n import _
 from ...services import rclone
 from ...ui.async_helper import run_async
 
@@ -119,7 +120,7 @@ class RemoteDialog(Adw.AlertDialog):
 
         # Name
         name_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        name_box.append(Gtk.Label(label="Nombre", xalign=0))
+        name_box.append(Gtk.Label(label=_("Nombre"), xalign=0))
         self.name_entry = Gtk.Entry()
         self.name_entry.set_hexpand(True)
         if remote_name:
@@ -129,7 +130,7 @@ class RemoteDialog(Adw.AlertDialog):
 
         # Type
         type_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        type_box.append(Gtk.Label(label="Tipo", xalign=0))
+        type_box.append(Gtk.Label(label=_("Tipo"), xalign=0))
         self.type_combo = Gtk.ComboBoxText()
         for t in self.type_list:
             self.type_combo.append_text(t)
@@ -365,9 +366,11 @@ class RemoteDialog(Adw.AlertDialog):
 
         # Upstreams
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box.append(Gtk.Label(label="Upstreams (remoto:/carpeta)", xalign=0))
+        box.append(Gtk.Label(label=_("Upstreams (remoto:/carpeta)"), xalign=0))
         help_lbl = Gtk.Label(
-            label="Ejemplo: nube1:/almacen nube2:/almacen. Cada upstream puede tener su propia carpeta.",
+            label=_(
+                "Ejemplo: nube1:/almacen nube2:/almacen. Cada upstream puede tener su propia carpeta."
+            ),
             xalign=0,
         )
         help_lbl.add_css_class("dim-label")
@@ -378,7 +381,7 @@ class RemoteDialog(Adw.AlertDialog):
         self._union_upstream_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.append(self._union_upstream_box)
 
-        add_btn = Gtk.Button(label="Añadir upstream")
+        add_btn = Gtk.Button(label=_("Añadir upstream"))
         add_btn.connect("clicked", lambda _b: self._add_union_upstream_row())
         box.append(add_btn)
         if not self.editing:
@@ -445,13 +448,13 @@ class RemoteDialog(Adw.AlertDialog):
 
         # cache_time
         row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        row.append(Gtk.Label(label="Cache time", xalign=0))
+        row.append(Gtk.Label(label=_("Cache time"), xalign=0))
         entry = Gtk.Entry()
-        entry.set_placeholder_text("ej. 5m")
-        entry.set_text("5m")
+        entry.set_placeholder_text("segundos (ej. 300)")
+        entry.set_text("300")
         entry.set_hexpand(True)
         row.append(entry)
-        help_lbl = Gtk.Label(label="Tiempo de cache de directorios del union.", xalign=0)
+        help_lbl = Gtk.Label(label=_("Tiempo de cache de directorios del union."), xalign=0)
         help_lbl.add_css_class("dim-label")
         help_lbl.add_css_class("caption")
         row.append(help_lbl)
@@ -460,7 +463,7 @@ class RemoteDialog(Adw.AlertDialog):
 
         # min_free_space
         row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        row.append(Gtk.Label(label="Min free space", xalign=0))
+        row.append(Gtk.Label(label=_("Min free space"), xalign=0))
         entry = Gtk.Entry()
         entry.set_placeholder_text("ej. 1G")
         entry.set_text("1G")
@@ -473,7 +476,7 @@ class RemoteDialog(Adw.AlertDialog):
         if not self.editing:
             # Creation: full crypt configuration.
             row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-            row.append(Gtk.Label(label="Remote (upstream)", xalign=0))
+            row.append(Gtk.Label(label=_("Remote (upstream)"), xalign=0))
             remote_combo = Gtk.ComboBoxText()
             for name in self._crypt_candidates():
                 remote_combo.append_text(name)
@@ -485,7 +488,7 @@ class RemoteDialog(Adw.AlertDialog):
             self.field_rows["remote"] = remote_combo
 
             row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-            row.append(Gtk.Label(label="Filename Encryption", xalign=0))
+            row.append(Gtk.Label(label=_("Filename Encryption"), xalign=0))
             fe_combo = Gtk.ComboBoxText()
             for val in ("standard", "obfuscate", "off"):
                 fe_combo.append_text(val)
@@ -493,7 +496,8 @@ class RemoteDialog(Adw.AlertDialog):
             fe_combo.set_hexpand(True)
             row.append(fe_combo)
             help_lbl = Gtk.Label(
-                label="standard: cifra nombres; obfuscate: ofusca; off: no cifra nombres.", xalign=0
+                label=_("standard: cifra nombres; obfuscate: ofusca; off: no cifra nombres."),
+                xalign=0,
             )
             help_lbl.add_css_class("dim-label")
             help_lbl.add_css_class("caption")
@@ -503,7 +507,7 @@ class RemoteDialog(Adw.AlertDialog):
             self.field_rows["filename_encryption"] = fe_combo
 
             row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-            row.append(Gtk.Label(label="Directory Name Encryption", xalign=0))
+            row.append(Gtk.Label(label=_("Directory Name Encryption"), xalign=0))
             de_combo = Gtk.ComboBoxText()
             for val in ("true", "false"):
                 de_combo.append_text(val)
@@ -511,7 +515,7 @@ class RemoteDialog(Adw.AlertDialog):
             de_combo.set_hexpand(True)
             row.append(de_combo)
             help_lbl = Gtk.Label(
-                label="true: cifra nombres de carpetas; false: los deja intactos.", xalign=0
+                label=_("true: cifra nombres de carpetas; false: los deja intactos."), xalign=0
             )
             help_lbl.add_css_class("dim-label")
             help_lbl.add_css_class("caption")
@@ -522,8 +526,10 @@ class RemoteDialog(Adw.AlertDialog):
         else:
             # Editing: only password-related fields are editable.
             info = Gtk.Label(
-                label="Edición segura: solo se pueden cambiar las contraseñas. "
-                "El upstream y el modo de cifrado no son editables para no dañar los datos.",
+                label=_(
+                    "Edición segura: solo se pueden cambiar las contraseñas. "
+                    "El upstream y el modo de cifrado no son editables para no dañar los datos."
+                ),
                 xalign=0,
             )
             info.add_css_class("dim-label")
@@ -533,7 +539,7 @@ class RemoteDialog(Adw.AlertDialog):
 
             if self._initial.get("remote"):
                 row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-                row.append(Gtk.Label(label="Remote (upstream, solo lectura)", xalign=0))
+                row.append(Gtk.Label(label=_("Remote (upstream, solo lectura)"), xalign=0))
                 lbl = Gtk.Label(label=str(self._initial.get("remote")), xalign=0)
                 lbl.add_css_class("monospace")
                 row.append(lbl)
@@ -543,7 +549,7 @@ class RemoteDialog(Adw.AlertDialog):
                 "directory_name_encryption"
             ):
                 row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-                row.append(Gtk.Label(label="Modo de cifrado (solo lectura)", xalign=0))
+                row.append(Gtk.Label(label=_("Modo de cifrado (solo lectura)"), xalign=0))
                 fe = self._initial.get("filename_encryption", "")
                 de = self._initial.get("directory_name_encryption", "")
                 lbl = Gtk.Label(label=f"filename={fe}, directory={de}", xalign=0)
@@ -553,13 +559,13 @@ class RemoteDialog(Adw.AlertDialog):
 
         # password (optional) - always editable
         row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        row.append(Gtk.Label(label="Password (opcional)", xalign=0))
+        row.append(Gtk.Label(label=_("Password (opcional)"), xalign=0))
         pw_entry = Gtk.Entry()
         pw_entry.set_visibility(False)
         pw_entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
         pw_entry.set_hexpand(True)
         row.append(pw_entry)
-        help_lbl = Gtk.Label(label="Deja en blanco para mantener la actual / omitir.", xalign=0)
+        help_lbl = Gtk.Label(label=_("Deja en blanco para mantener la actual / omitir."), xalign=0)
         help_lbl.add_css_class("dim-label")
         help_lbl.add_css_class("caption")
         row.append(help_lbl)
@@ -568,14 +574,14 @@ class RemoteDialog(Adw.AlertDialog):
 
         # password2 (optional) - always editable
         row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        row.append(Gtk.Label(label="Password 2 (opcional)", xalign=0))
+        row.append(Gtk.Label(label=_("Password 2 (opcional)"), xalign=0))
         pw2_entry = Gtk.Entry()
         pw2_entry.set_visibility(False)
         pw2_entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
         pw2_entry.set_hexpand(True)
         row.append(pw2_entry)
         help_lbl = Gtk.Label(
-            label="Salt opcional. Deja en blanco para mantener la actual / omitir.", xalign=0
+            label=_("Salt opcional. Deja en blanco para mantener la actual / omitir."), xalign=0
         )
         help_lbl.add_css_class("dim-label")
         help_lbl.add_css_class("caption")
@@ -591,6 +597,8 @@ class RemoteDialog(Adw.AlertDialog):
             return await rclone.config_dump(self.profile, config_password=pwd)
 
         def on_success(dump):
+            if isinstance(dump, dict):
+                self._cached_dump = dump
             data = dump.get(self.remote_name, {}) if isinstance(dump, dict) else {}
             self._initial = dict(data) if isinstance(data, dict) else {}
             rtype = data.get("type", "") if isinstance(data, dict) else ""
@@ -617,8 +625,6 @@ class RemoteDialog(Adw.AlertDialog):
                         self._add_union_upstream_row(token.strip(), "")
                 if not tokens:
                     self._add_union_upstream_row()
-                if not tokens:
-                    self._add_union_upstream_row()
             for key, widget in self.field_rows.items():
                 if key not in data:
                     continue
@@ -639,7 +645,7 @@ class RemoteDialog(Adw.AlertDialog):
                     widget.set_text(val)
 
         def on_error(exc):
-            self.window.toast(f"Error cargando remoto: {exc}")
+            self.window.toast(_("Error cargando remoto: {exc}").format(exc=exc))
 
         run_async(fetch(), on_success=on_success, on_error=on_error)
 
@@ -671,6 +677,24 @@ class RemoteDialog(Adw.AlertDialog):
                 val = val + ":"
             if val:
                 opts[key] = val
+        # cache_time must be an integer (seconds) for the union backend.
+        if "cache_time" in opts:
+            raw = str(opts["cache_time"]).strip().lower()
+            try:
+                opts["cache_time"] = str(int(raw))
+            except ValueError:
+                total = 0
+                import re
+
+                for num, unit in re.findall(r"(\d+)\s*([smh])", raw):
+                    n = int(num)
+                    if unit == "s":
+                        total += n
+                    elif unit == "m":
+                        total += n * 60
+                    elif unit == "h":
+                        total += n * 3600
+                opts["cache_time"] = str(total if total > 0 else 300)
         return opts
 
     def _on_response(self, _dlg, response) -> None:
@@ -679,7 +703,7 @@ class RemoteDialog(Adw.AlertDialog):
             return
         name = self.name_entry.get_text().strip()
         if not name:
-            self.window.toast("El nombre es obligatorio")
+            self.window.toast(_("El nombre es obligatorio"))
             return
         rtype = self.type_combo.get_active_text() or ""
         opts = self._collect_opts()
@@ -712,13 +736,19 @@ class RemoteDialog(Adw.AlertDialog):
             else:
                 await rclone.create_remote(self.profile, name, rtype, opts)
 
-        def ok(_):
-            self.window.toast(f"Remoto '{name}' guardado")
+        def ok(_result):
+            try:
+                from ...services import mount_manager
+
+                mount_manager._invalidate_profile_dump_cache(self.profile)
+            except Exception:
+                pass
+            self.window.toast(_("Remoto '{name}' guardado").format(name=name))
             if self.on_saved:
                 self.on_saved()
             self.close()
 
         def err(exc):
-            self.window.toast(f"Error: {exc}")
+            self.window.toast(_("Error: {exc}").format(exc=exc))
 
         run_async(do(), on_success=ok, on_error=err)

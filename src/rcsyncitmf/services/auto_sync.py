@@ -8,11 +8,9 @@ rclone. State is persisted per (profile, union) via ``sync_state``.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 import threading
-
-from gi.repository import GLib
+from pathlib import Path
 
 from ..config import load_settings
 from . import profile_store, rclone, sync_state, union_sync
@@ -49,26 +47,30 @@ class AutoSyncManager:
 
     async def _cycle(self, settings: dict) -> None:
         concurrency = int(settings.get("concurrency", 4))
-        allow_delete = bool(settings.get("auto_sync_allow_delete", False))
-        use_purge = bool(settings.get("auto_sync_use_purge", False))
-        max_deletions = int(settings.get("auto_sync_max_deletions", 100))
+        raw_depth = int(settings.get("sync_depth", 0) or 0)
+        depth = None if raw_depth <= 0 else raw_depth
 
-        for profile in profile_store.list_profiles():
+        profiles = profile_store.list_profiles()
+
+        async def sync_profile(profile: Path) -> None:
             try:
                 pwd = profile_store.get_cached_password(profile)
                 dump = await rclone.config_dump(profile, config_password=pwd)
             except Exception as exc:
                 logger.warning("auto-sync: cannot read profile %s: %s", profile, exc)
-                continue
+                return
             if not isinstance(dump, dict):
-                continue
-            for name, data in dump.items():
-                if not (isinstance(data, dict) and data.get("type") == "union"):
-                    continue
+                return
+            unions = [
+                (name, data)
+                for name, data in dump.items()
+                if isinstance(data, dict) and data.get("type") == "union"
+            ]
+
+            async def sync_union(name: str, data: dict) -> None:
                 upstreams = union_sync.parse_upstreams(str(data.get("upstreams", "")))
                 if not upstreams:
-                    continue
-
+                    return
                 state = sync_state.load_state(profile, name)
                 baseline = None
                 previous = None
@@ -78,36 +80,38 @@ class AutoSyncManager:
                         paths = state.get("paths")
                         if isinstance(paths, list):
                             baseline = set(paths)
-
                 plan = await union_sync.build_mirror_plan(
                     profile,
                     upstreams,
                     baseline=baseline,
                     previous_upstreams=previous,
-                    allow_delete=allow_delete,
-                    max_deletions=max_deletions,
+                    depth=depth,
+                    allow_delete=False,
+                    max_deletions=0,
                 )
-
                 errs = await union_sync.apply_plan(
                     profile,
                     plan,
                     concurrency=concurrency,
-                    delete=allow_delete,
-                    use_purge=use_purge,
+                    delete=False,
+                    use_purge=False,
                 )
                 if errs:
                     for err in errs:
-
-                        def _show(e=err):
-                            with contextlib.suppress(Exception):
-                                _toast(e)
-                            return False
-
-                        with contextlib.suppress(Exception):
-                            GLib.idle_add(_show)
-                    continue
+                        logger.warning("auto-sync: %s", err)
+                    return
                 if plan.baseline is not None:
                     sync_state.save_state(profile, name, upstreams, plan.baseline)
+
+            await asyncio.gather(
+                *[sync_union(name, data) for name, data in unions],
+                return_exceptions=True,
+            )
+
+        results = await asyncio.gather(*[sync_profile(p) for p in profiles], return_exceptions=True)
+        for res in results:
+            if isinstance(res, Exception):
+                logger.exception("auto-sync: profile sync failed", exc_info=res)
 
     def _toast(self, message: str) -> bool:
         # Resolved lazily to avoid import cycles.

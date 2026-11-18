@@ -2,11 +2,37 @@
 name = "rcsyncitmf"
 version = "0.1.0"
 description = "GNOME-style multi-config rclone manager"
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "RCSyncitMF" }]
+keywords = ["rclone", "gnome", "gtk4", "libadwaita", "flatpak", "union"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: X11 Applications :: GTK",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: System :: Filesystems",
+  "Topic :: Utilities",
+]
 dependencies = ["PyGObject>=3.46", "tomli-w>=1.0"]
 
 [project.optional-dependencies]
-dev = ["mypy>=1.10", "ruff>=0.6", "pytest>=8"]
+dev = [
+  "mypy>=1.10",
+  "ruff>=0.6",
+  "pytest>=8",
+  "build>=1.0",
+  "python-semantic-release>=9.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/sebas/RCSyncit-MF"
+Repository = "https://github.com/sebas/RCSyncit-MF"
+Issues = "https://github.com/sebas/RCSyncit-MF/issues"
 
 [project.scripts]
 rcsyncitmf = "rcsyncitmf.__main__:main"
@@ -18,6 +44,18 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["rcsyncitmf*"]
+
+[tool.setuptools.package-data]
+rcsyncitmf = ["resources/*", "locales/*"]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+changelog_file = "CHANGELOG.md"
+build_command = "python -m build"
+upload_to_pypi = false
+upload_to_release = true
+tag_format = "v{version}"
 
 [tool.mypy]
 python_version = "3.11"
@@ -38,3 +76,6 @@ select = ["F", "E", "W", "I", "UP", "B", "SIM", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 "src/rcsyncitmf/**/*.py" = ["E402"]
 "src/rcsyncitmf/ui/**/*.py" = ["E501"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

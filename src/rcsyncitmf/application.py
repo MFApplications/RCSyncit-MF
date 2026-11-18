@@ -15,6 +15,7 @@ from gi.repository import Adw, Gio, GLib
 
 from . import APP_ID
 from .config import LOG_FILE, ensure_dirs
+from .i18n import _
 from .services.auto_sync import AutoSyncManager
 from .window import MainWindow
 
@@ -40,11 +41,36 @@ class RCSyncitMFApplication(Adw.Application):
         window = MainWindow(application=self)
         window.present()
         # Graceful checks (after present so toasts render)
-        if shutil.which("rclone") is None:
-            window.toast("rclone no encontrado en PATH")
-            logging.error("rclone not found in PATH")
+        from .services.rclone import in_flatpak as _in_flatpak
+
+        rclone_ok = True
+        if _in_flatpak():
+            import subprocess as _sp
+            import threading as _threading
+
+            result = {"ok": True}
+
+            def _check() -> None:
+                try:
+                    _sp.run(
+                        ["flatpak-spawn", "--host", "rclone", "version"],
+                        capture_output=True,
+                        check=True,
+                    )
+                except Exception:
+                    result["ok"] = False
+
+            t = _threading.Thread(target=_check, daemon=True)
+            t.start()
+            t.join(timeout=10)
+            rclone_ok = result["ok"]
+        else:
+            rclone_ok = shutil.which("rclone") is not None
+        if not rclone_ok:
+            window.toast(_("rclone no encontrado en el host"))
+            logging.error("rclone not found on host")
         if not Path("/dev/fuse").exists():
-            window.toast("FUSE no disponible: mounts deshabilitados")
+            window.toast(_("FUSE no disponible: mounts deshabilitados"))
             logging.warning("/dev/fuse not present")
         # Drop stale mount entries (only those still mounted are kept).
         try:

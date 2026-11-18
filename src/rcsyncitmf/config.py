@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import tomllib
 from pathlib import Path
 
@@ -20,6 +21,8 @@ MOUNTS_FILE = APP_DIR / "mounts.toml"
 SETTINGS_FILE = APP_DIR / "settings.toml"
 LOG_FILE = APP_DIR / "app.log"
 
+_CONFIG_LOCK = threading.RLock()
+
 # Legacy (JSON) paths kept for one-shot migration.
 _LEGACY_SETTINGS_FILE = APP_DIR / "settings.json"
 _LEGACY_MOUNTS_FILE = APP_DIR / "mounts.json"
@@ -27,13 +30,11 @@ _LEGACY_MOUNTS_FILE = APP_DIR / "mounts.json"
 DEFAULT_SETTINGS: dict = {
     "profiles_dir": str(PROFILES_DIR),
     "concurrency": 4,
-    "sync_depth": 1,  # 1 = top-level only
-    "dry_run_default": True,
+    "sync_depth": 0,  # 0 = todos los directorios (recursivo completo)
     "rclone_bin": "rclone",
     "auto_sync_interval": 300,
-    "auto_sync_allow_delete": True,
-    "auto_sync_use_purge": False,
-    "auto_sync_max_deletions": 100,
+    "language": "auto",
+    "mounts_dir": "",
 }
 
 
@@ -100,7 +101,8 @@ def load_toml(path: Path, legacy: Path | None = None) -> dict:
 
 def save_toml(path: Path, data: dict) -> None:
     ensure_dirs()
-    path.write_bytes(tomli_w.dumps(data).encode("utf-8"))
+    with _CONFIG_LOCK:
+        path.write_bytes(tomli_w.dumps(data).encode("utf-8"))
 
 
 def load_settings() -> dict:
