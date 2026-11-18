@@ -35,4 +35,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-# workflow restore trigger
