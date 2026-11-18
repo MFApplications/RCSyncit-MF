@@ -29,10 +29,10 @@ jobs:
       - name: Semantic release version
         run: semantic-release version
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
       - name: Semantic release publish
         run: semantic-release publish
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
 
 # workflow restore trigger
