@@ -4,14 +4,13 @@ version = "0.1.0"
 description = "GNOME-style multi-config rclone manager"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "GPL-3.0-or-later" }
+license = "GPL-3.0-or-later"
 authors = [{ name = "RCSyncitMF" }]
 keywords = ["rclone", "gnome", "gtk4", "libadwaita", "flatpak", "union"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications :: GTK",
   "Intended Audience :: End Users/Desktop",
-  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
