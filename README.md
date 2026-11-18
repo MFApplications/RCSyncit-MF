@@ -1,96 +1,84 @@
 # RCSyncitMF
 
-GNOME (libadwaita) manager for **rclone** with support for multiple configuration files (profiles), remotes, unions, and mounts, including synchronization of the directory structure between a union's upstreams.
+![RCSyncitMF logo](data/icons/hicolor/scalable/apps/io.github.MFApplications.RCSyncitMF.svg)
 
-## Features
+GNOME/libadwaita manager for rclone with multi-profile support.
 
-- **Profiles**: create, import, rename, and delete rclone `.conf` files.
-- **Remotes**: create/edit/delete remotes (local, drive, s3, dropbox, onedrive, union, etc.) and test connections.
-- **Unions**: create unions by selecting upstreams; sync folders between upstreams (dry-run by default).
-- **Mounts**: mount/unmount remotes with `rclone mount --daemon`, with configurable VFS options.
-- **Settings**: concurrency, depth, rclone binary, language, auto-sync interval.
-- **Theme**: automatic light/dark theme (libadwaita).
-- **Flatpak**: sandboxed execution using the host's `rclone` via `flatpak-spawn`.
+## What it does
+
+- Manage profiles, remotes, unions, and mounts from a GTK4 UI.
+- Sync a union's upstreams; dry-run by default.
+- Mount remotes with `rclone mount --daemon`.
+- Run host `rclone` from the Flatpak via `flatpak-spawn`.
 
 ## Requirements
 
-- Python >= 3.11
-- PyGObject (GTK 4 + libadwaita)
-- rclone >= 1.60
-- (For mounts) FUSE (`/dev/fuse`) and `fusermount`/`fusermount3`
+- Python 3.11+
+- PyGObject (GTK4 + libadwaita)
+- rclone 1.60+
+- FUSE and `fusermount`/`fusermount3` (mounts only)
 
-## Installation (development)
+## Install
 
-```bash
-python -m pip install -e .
-rcsyncitmf
-```
+Development:
 
-## Installation as a desktop app
+    python -m pip install -e .
+    rcsyncitmf
 
-```bash
-./install.sh
-```
+Desktop:
 
-## Flatpak
+    ./install.sh
 
-```bash
-flatpak-builder --user --install --force-clean build com.rcsyncitmf.app.yml
-flatpak run com.rcsyncitmf.app
-```
+Flatpak:
 
-The app uses the host's `rclone`. Make sure it is installed and available in `PATH`.
+    flatpak-builder --user --install --force-clean build io.github.MFApplications.RCSyncitMF.yml
+    flatpak run io.github.MFApplications.RCSyncitMF
 
-### Recommended Flatseal permissions
-
-| Permission | Why | Where to enable |
-|---|---|---|
-| Network | rclone accesses clouds/HTTP | Network → Access network |
-| Home folder | Profiles, config, mounts, and cache live in `~` | Filesystem → Home folder |
-| All devices | Access to `/dev/fuse` for mounts | Device → All devices |
-| D-Bus `org.freedesktop.Flatpak` | `flatpak-spawn --host` to run rclone/fusermount | (Advanced) Talk to D-Bus / Flatpak portal |
-| XDG config/cache (optional) | Extra access to `~/.config` and `~/.cache` | Filesystem → xdg-config, xdg-cache |
-
-**Host prerequisites (Flatpak):**
-- `rclone` installed.
-- FUSE available (`/dev/fuse`, `fusermount`/`fusermount3`).
-- Mount points are created under `~/.local/share/rcsyncitmf/mnt`.
+The Flatpak uses the host's `rclone`. Install it and add it to `PATH`.
 
 ## Quick start
 
-1. **Profiles**: create or import rclone `.conf` files.
-2. **Remotes**: create/edit/delete remotes within a profile.
-3. **Unions**: create a union by selecting upstreams; use “Sync folders” (dry-run by default).
-4. **Mounts**: mount a remote with `rclone mount --daemon`; unmount with `fusermount -u`.
-5. **Settings**: concurrency, mode, depth, default dry-run, rclone binary, language.
+1. Create or import a profile.
+2. Add remotes.
+3. Create a union and sync folders (dry-run by default).
+4. Mount and unmount remotes.
+5. Adjust settings (concurrency, depth, language, auto-sync).
 
-## Project structure
+## Flatpak permissions
 
-```
-src/rcsyncitmf/
-  application.py   # Adw.Application
-  window.py        # main window (sidebar + stack)
-  config.py        # XDG paths and TOML settings
-  services/        # rclone wrapper, profiles, union sync, mounts
-  ui/pages/        # profiles, remotes, unions, mounts, settings
-  ui/dialogs/      # remote, union
-  resources/       # CSS
-  locales/         # i18n JSON
-```
+| Permission | Why |
+|---|---|
+| Network | Cloud and HTTP access |
+| Home folder | Profiles, config, mounts, cache |
+| All devices | `/dev/fuse` for mounts |
+| D-Bus `org.freedesktop.Flatpak` | Run host `rclone`/`fusermount` |
+
+Host prerequisites: `rclone`, FUSE, `fusermount`/`fusermount3`. Mount points live under `~/.local/share/rcsyncitmf/mnt`.
 
 ## Development
 
-```bash
-python -m pip install -e ".[dev]"
-ruff check src tests
-mypy src/rcsyncitmf
-pytest -q
-```
+    python -m pip install -e ".[dev]"
+    ruff check src tests
+    ruff format --check src tests
+    mypy src/rcsyncitmf
+    pytest -q
+
+## Project layout
+
+    src/rcsyncitmf/
+      application.py   Adw.Application
+      window.py        main window
+      config.py        XDG paths and TOML settings
+      services/        rclone, profiles, union sync, mounts
+      ui/pages/        profiles, remotes, unions, mounts, settings
+      ui/dialogs/      remote, union
+      resources/       CSS
+      locales/         i18n JSON
 
 ## Releases
 
-Releases are generated automatically with **semantic-release** from conventional commits (`feat:`, `fix:`, `BREAKING CHANGE:`) pushed to `main`.
+Automated with semantic-release from conventional commits on `main`.
 
 ## License
 
-GPL-3.0-or-later.
+GPL-3.0-or-later
