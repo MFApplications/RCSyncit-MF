@@ -1,6 +1,6 @@
 [project]
 name = "rcsyncitmf"
-version = "0.1.0"
+version = "1.0.0"
 description = "GNOME-style multi-config rclone manager"
 readme = "README.md"
 requires-python = ">=3.11"
