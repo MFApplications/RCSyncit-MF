@@ -147,10 +147,26 @@ class ProfilesPage(Gtk.Box):
         path = self._rows.get(row) if row is not None else None
         if path is None:
             return
+        from ...services import profile_store
+
+        # Ask for the password up-front for encrypted profiles to avoid
+        # presenting two dialogs at once (which could dismiss the detail modal).
+        if (
+            profile_store.encrypted_flag(path) is True
+            and profile_store.get_cached_password(path) is None
+        ):
+            self.window.ask_profile_password(path, lambda _p: self._open_profile_detail(path))
+        else:
+            self._open_profile_detail(path)
+
+    def _open_profile_detail(self, path: Path) -> None:
         from ..dialogs.profile_detail import ProfileDetailDialog
 
-        dlg = ProfileDetailDialog(self.window, path)
-        dlg.present(self.window)
+        try:
+            dlg = ProfileDetailDialog(self.window, path)
+            dlg.present(self.window)
+        except Exception as exc:
+            self.window.toast(_("Error abriendo perfil: {exc}").format(exc=exc))
 
     def _on_row_selected(self, _lb, row) -> None:
         self.btn_delete.set_sensitive(row is not None and row in self._rows)

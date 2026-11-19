@@ -80,6 +80,8 @@ class AutoSyncManager:
                         paths = state.get("paths")
                         if isinstance(paths, list):
                             baseline = set(paths)
+                # Safety: the background daemon only propagates creations, never
+                # deletions, to avoid data loss on unattended runs.
                 plan = await union_sync.build_mirror_plan(
                     profile,
                     upstreams,

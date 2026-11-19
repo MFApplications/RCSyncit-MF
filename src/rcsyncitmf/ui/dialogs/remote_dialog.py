@@ -95,19 +95,35 @@ class RemoteDialog(Adw.AlertDialog):
         self.on_saved = on_saved
         self.editing = remote_name is not None
         self._initial: dict = {}
+        self._cached_dump: dict[str, Any] | None = None
+        self._dump_loading: bool = False
 
         # Available backends (exclude "local": the app does not manage local remotes).
-        providers = rclone.list_providers()
-        self._providers = providers if providers else []
-        prefixes = []
-        for p in self._providers:
-            pref = p.get("Prefix")
-            # Unions are managed exclusively in the Unions section.
-            if pref and pref not in ("local", "union"):
-                prefixes.append(pref)
-        if not prefixes:
-            prefixes = [t for t in REMOTE_TYPES_FALLBACK if t not in ("local", "union")]
+        # Loaded asynchronously to avoid blocking the GTK thread; start with fallback.
+        self._providers: list[dict[str, Any]] = []
+        prefixes = [t for t in REMOTE_TYPES_FALLBACK if t not in ("local", "union")]
         self.type_list = sorted(set(prefixes))
+
+        # Kick off async provider load; rebuild type combo when it arrives.
+        def _on_providers(provs):
+            provs = provs if isinstance(provs, list) else []
+            self._providers = provs
+            new_prefixes = []
+            for p in provs:
+                pref = p.get("Prefix") if isinstance(p, dict) else None
+                if pref and pref not in ("local", "union"):
+                    new_prefixes.append(pref)
+            if not new_prefixes:
+                return
+            active = self.type_combo.get_active_text()
+            self.type_list = sorted(set(new_prefixes))
+            self.type_combo.remove_all()
+            for t in self.type_list:
+                self.type_combo.append_text(t)
+            if active and active in self.type_list:
+                self.type_combo.set_active(self.type_list.index(active))
+            elif self.type_list:
+                self.type_combo.set_active(0)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_top(12)
@@ -152,12 +168,17 @@ class RemoteDialog(Adw.AlertDialog):
         fields_scrolled.set_child(self.fields_box)
         box.append(fields_scrolled)
         self.field_rows: dict[str, Gtk.Entry | Gtk.ComboBoxText] = {}
-        self._cached_dump: dict[str, Any] | None = None
         self._union_upstream_rows: list[dict[str, Any]] = []
         self._union_upstream_box: Gtk.Box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self._union_refreshing: bool = False
 
         self.type_combo.connect("changed", self._on_type_changed)
+
+        # Asynchronously refresh the provider list (non-blocking).
+        from ...ui.async_helper import run_async
+
+        run_async(rclone.async_list_providers(), on_success=_on_providers)
+
         self._on_type_changed(self.type_combo)
 
         self.set_extra_child(box)
@@ -180,20 +201,35 @@ class RemoteDialog(Adw.AlertDialog):
 
     def _ensure_dump(self) -> dict[str, Any]:
         if self._cached_dump is not None:
-            return self._cached_dump
-        import asyncio
+            return self._cached_dump or {}
+        # Trigger an async load (non-blocking) the first time.
+        if not getattr(self, "_dump_loading", False):
+            self._dump_loading = True
 
-        from ...services import profile_store
+            async def _fetch():
+                from ...services import profile_store
 
-        pwd = profile_store.get_cached_password(self.profile)
-        try:
-            dump = asyncio.run(rclone.config_dump(self.profile, config_password=pwd))
-        except Exception:
-            dump = {}
-        if not isinstance(dump, dict):
-            dump = {}
-        self._cached_dump = dump
-        return dump
+                pwd = profile_store.get_cached_password(self.profile)
+                return await rclone.config_dump(self.profile, config_password=pwd)
+
+            def _ok(dump):
+                self._dump_loading = False
+                if not isinstance(dump, dict):
+                    dump = {}
+                self._cached_dump = dump
+                # Rebuild fields now that the dump is available.
+                t = self.type_combo.get_active_text() if hasattr(self, "type_combo") else None
+                if t in ("crypt", "union"):
+                    self._on_type_changed(self.type_combo)
+
+            def _err(_exc):
+                self._dump_loading = False
+                self._cached_dump = {}
+
+            from ...ui.async_helper import run_async
+
+            run_async(_fetch(), on_success=_ok, on_error=_err)
+        return {}
 
     def _fields_for(self, ptype: str) -> list[tuple[str, str, str]]:
         prov = self._provider_for(ptype)
@@ -677,8 +713,10 @@ class RemoteDialog(Adw.AlertDialog):
                 val = val + ":"
             if val:
                 opts[key] = val
+            elif self.editing:
+                opts[key] = ""
         # cache_time must be an integer (seconds) for the union backend.
-        if "cache_time" in opts:
+        if "cache_time" in opts and str(opts["cache_time"]).strip() != "":
             raw = str(opts["cache_time"]).strip().lower()
             try:
                 opts["cache_time"] = str(int(raw))

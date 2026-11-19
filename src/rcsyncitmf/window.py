@@ -63,7 +63,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.stack.add_titled(self.remotes_page, "remotes", _("Remotos"))
         self.stack.add_titled(self.unions_page, "unions", _("Unions"))
         self.stack.add_titled(self.mounts_page, "mounts", _("Mounts"))
-        self.stack.add_titled(self.settings_page, "settings", "Ajustes")
+        self.stack.add_titled(self.settings_page, "settings", _("Ajustes"))
 
         # Drag & drop: import .conf files
         drop = Gtk.DropTarget.new(Gdk.FileList, Gdk.DragAction.COPY)
@@ -199,11 +199,11 @@ class MainWindow(Adw.ApplicationWindow):
             return
         # Ask user
         dlg = Adw.AlertDialog.new(
-            "rclone.conf detectado",
-            f"Se encontró {default}. ¿Importarlo como perfil?",
+            _("rclone.conf detectado"),
+            _("Se encontró {default}. ¿Importarlo como perfil?").format(default=default),
         )
-        dlg.add_response("cancel", "Cancelar")
-        dlg.add_response("import", "Importar")
+        dlg.add_response("cancel", _("Cancelar"))
+        dlg.add_response("import", _("Importar"))
         dlg.set_response_appearance("import", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("import")
         dlg.set_close_response("cancel")
@@ -329,7 +329,9 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_logo(texture)
             except Exception:
                 pass
-        dlg.set_version("1.0.0")
+        from . import __version__ as _version
+
+        dlg.set_version(_version)
         dlg.set_developer_name("RCSyncitMF")
         dlg.set_comments(_("Gestor GNOME para rclone con multi-config y union sync."))
         dlg.present(self)

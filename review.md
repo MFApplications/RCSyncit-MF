@@ -1,16 +1,17 @@
 # Análisis profundo del proyecto RCSyncitMF
 
-**Fecha:** 2026-11-16
-**Rama analizada:** `develop` (working tree con cambios sin commitear)
-**Commits base:** `adb0186` (Initial commit on develop), `1c4ce48` (Initial commit)
+**Fecha:** 2026-11-19
+**Rama analizada:** `develop` (árbol de trabajo limpio)
+**Commits base:** `a2664fa` (último en develop)
+**Alcance:** revisión de corrección, integración, diseño, i18n, Flatpak y calidad automatizada. No se encontró `plan.md` en el repositorio, por lo que la sección de cumplimiento del plan se marca como no aplicable.
 
 ---
 
 ## 1. Resumen ejecutivo
 
-RCSyncitMF es una aplicación de escritorio GNOME (GTK 4 + libadwaita) escrita en Python que actúa como gestor multi-perfil de `rclone`. Permite administrar perfiles (`.conf`), remotos, unions, mounts (FUSE) y sincronización de estructura de directorios entre upstreams de un union. El proyecto está en fase **Alpha (0.1.0)** y combina una capa de servicios (subprocess async a rclone) con una UI GTK construida manualmente.
+RCSyncitMF es una aplicación de escritorio GNOME (GTK 4 + libadwaita) en Python que actúa como gestor multi-perfil de `rclone`. Permite administrar perfiles (`.conf`), remotos, unions, mounts (FUSE) y sincronización de la **estructura de directorios** entre upstreams de un union. Versión actual `1.0.0`, fase Alpha.
 
-**Estado general:** El código compila conceptualmente (mypy sin errores, ruff sin hallazgos, 20 tests pasan). Sin embargo, hay **al menos un bug funcional claro** (Copiar/Mover en el explorador de archivos rompe por atributo no definido), varios **bloqueos del hilo de UI** por llamadas síncronas a rclone, y **cobertura de tests limitada** (solo 3 módulos de servicio, sin UI ni integración).
+**Estado general:** El código pasa las tres verificaciones automatizadas (22 tests, ruff sin hallazgos, mypy sin errores en 27 archivos). La iteración anterior corrigió el blocker de Copiar/Mover en el explorador, el bloqueo de caché de directorio, la invalidación del binario de rclone y el bloqueo de `MountsPage`/`ProfilesPage`. Sin embargo, **varios puntos de bloqueo del hilo de UI por llamadas síncronas a rclone siguen presentes** (en `RemoteDialog`, `profile_detail`, `mount_manager._dump_for_profile`), hay inconsistencias de mensajería en la sincronización de unions y varios detalles de integración sin cubrir por tests.
 
 ---
 
@@ -60,196 +61,212 @@ src/rcsyncitmf/
 
 ---
 
-## 3. Verificación de calidad automatizada
+## 3. Calidad automatizada
 
 | Herramienta | Resultado |
 |---|---|
-| `pytest -q` | **20/20 passed** (0.05s) |
+| `pytest -q` | **22/22 passed** (0.04s) |
 | `ruff check src tests` | **All checks passed** |
 | `mypy src/rcsyncitmf` | **Success: no issues (27 archivos)** |
 
 ### Cobertura de tests
 
 - `tests/test_profile_store.py` (6 tests): create/list/delete/rename/import/meta.
-- `tests/test_mount_manager.py` (9 tests): mountpoint, cache, safe_remote, read log.
-- `tests/test_union_sync.py` (5 tests): parse, collapse, join, build_mirror_plan, apply.
+- `tests/test_mount_manager.py` (9 tests): mountpoint, cache, safe_remote, read log, custom dir, cleanup.
+- `tests/test_union_sync.py` (7 tests): parse, collapse, join, build_mirror_plan, apply.
 
-**No hay tests para:** `rclone.py`, `config.py`, `sync_state.py`, `auto_sync.py`, `profile_store.is_encrypted`, `union_sync.normalize_union_cache_times`, `remote_dialog`, `union_dialog`, `files_page`, `mounts_page`, `window`, `application`.
+**No hay tests para:** `rclone.py`, `config.py`, `sync_state.py`, `auto_sync.py`, `profile_store.is_encrypted`, `union_sync.normalize_union_cache_times`, `remote_dialog`, `union_dialog`, `files_page`, `mounts_page`, `window`, `application`, `profile_detail`.
 
 ---
 
-## 4. Hallazgos de corrección (Correctness Issues)
+## 4. Cumplimiento del plan
 
-### 4.1 🔴 Bug funcional: `FilesPage._transfer_dialog` usa `self.remotes` no definido
+No se encontró `plan.md` (ni `research.md`) en el repositorio. Por lo tanto, no es posible evaluar cumplimiento contra un plan aprobado. La revisión siguiente se basa en la corrección general del código y en la coherencia interna del proyecto.
 
-- **Archivo:** `src/rcsyncitmf/ui/pages/files_page.py` (líneas 717-753)
-- **Descripción:** El método `_transfer_dialog` (invocado por “Copiar” y “Mover”) itera `self.remotes`, pero `FilesPage` nunca inicializa ese atributo (solo define `self.targets`, `self.active_remote`, etc.). Al pulsar Copiar/Mover se lanza `AttributeError: 'FilesPage' object has no attribute 'remotes'`.
-- **Impacto:** Funcionalidad de copiar/mover entre remotos completamente rota.
-- **Esperado:** Poblar `self.remotes` con los nombres de remoto del perfil activo (o de los targets montados) antes de abrir el diálogo, o derivar la lista dentro del diálogo.
+---
 
-### 4.2 🟠 Bloqueos del hilo de UI por llamadas síncronas a rclone
+## 5. Hallazgos de corrección (Correctness Issues)
 
-Varios métodos ejecutan `rclone` de forma síncrona en el hilo principal de GTK:
+### 5.1 🔴 High — Bloqueos del hilo de UI por llamadas síncronas a rclone (parcialmente pendiente)
 
-- **`RemoteDialog._ensure_dump`** (`remote_dialog.py:185-195`): usa `asyncio.run(rclone.config_dump(...))` dentro de `_crypt_candidates`, `_crypt_parents`, `_union_remotes`. Se invoca durante la construcción del diálogo y al cambiar tipo, bloqueando la UI hasta que rclone responda.
-- **`mount_manager._dump_for_profile`** (`mount_manager.py:478-495`): crea un event loop y ejecuta `rclone.config_dump` sincrónicamente. Se alcanza desde `MountsPage.refresh` → `crypt_parents_with_cache`/`related_cache_remotes` en el hilo de UI.
-- **`profile_store.is_encrypted`** (`profile_store.py:155-175`): crea event loop sincrónico. Se llama desde `ProfilesPage._on_toggle_encrypt` en UI.
-- **`ProfilesPage._on_toggle_encrypt`** llama `is_encrypted` directamente.
+La iteración anterior movió `MountsPage` y `ProfilesPage` a variantes asíncronas, pero varios puntos siguen ejecutando `rclone` de forma síncrona en el hilo principal de GTK:
 
-**Impacto:** Congelamiento de la ventana mientras rclone consulta backends remotos (especialmente con perfiles cifrados o redes lentas).
+- **`RemoteDialog._ensure_dump`** (`remote_dialog.py:181-195`): usa `asyncio.run(rclone.config_dump(...))`. Se invoca durante la construcción del diálogo y al cambiar tipo (crypt/union), bloqueando la UI hasta que rclone responda. Afecta `_crypt_candidates`, `_crypt_parents`, `_union_remotes`.
+- **`profile_store.is_encrypted`** (`profile_store.py:167-189`): crea un event loop sincrónico. Aún se usa en `ProfileDetailDialog._load_accounts` (`profile_detail.py:202`) en el manejador de error, bloqueando la UI al fallar la carga de un perfil cifrado.
+- **`mount_manager._dump_for_profile`** (`mount_manager.py:554-578`): crea un event loop sincrónico. Se usa por `crypt_parent` y `related_cache_remotes` (síncronos). `MountsPage` ya usa las variantes async, pero `related_cache_remotes` sigue siendo síncrono y se llama desde `clear_vfs_cache` (bloqueando el event loop async breve).
+- **`rclone.list_providers`** (`rclone.py`, función síncrona con `subprocess.run`): se llama en `RemoteDialog.__init__` (`remote_dialog.py:100`) durante la construcción del diálogo, pudiendo bloquear hasta 30 s si rclone tarda.
 
-### 4.3 🟠 `SettingsPage` no invalida la caché del binario de rclone
+**Impacto:** congelamiento de la ventana con perfiles cifrados, redes lentas o rclone lento.
 
-- **Archivo:** `src/rcsyncitmf/services/rclone.py` (`_RCLONE_BIN_CACHE`) y `src/rcsyncitmf/ui/pages/settings_page.py` (`_apply`)
-- **Descripción:** `rclone_bin()` cachea la resolución de `shutil.which(name)` por nombre. Si el usuario cambia el binario en Ajustes y vuelve a un nombre previamente usado, se reutiliza la ruta antigua hasta reiniciar.
-- **Impacto:** Cambio de binario puede no aplicarse sin reinicio.
+### 5.2 🟠 Medium — Mensajería inconsistente en sincronización de unions
 
-### 4.4 🟡 `profiles_dir` de settings no se usa
+- **Archivo:** `src/rcsyncitmf/ui/pages/unions_page.py` (`_on_sync`, `_show_preview`)
+- **Descripción:** La vista previa anuncia “creaciones; borrados deshabilitados por seguridad”, pero `_on_sync` fuerza `delete_enabled=False` y `allow_delete=False`, por lo que nunca se propagan borrados desde la UI. Además, `_show_preview` muestra una nota sobre `action_policy` (`epall`/`all`) que sugiere que los borrados se propagan automáticamente, cuando en realidad están deshabilitados siempre. La interfaz también ofrece un switch “Purge (borrado recursivo)” que no tiene efecto porque no hay operaciones de borrado.
+- **Impacto:** confusión del usuario; la UI promete funcionalidad que no se ejecuta.
 
-- **Archivo:** `src/rcsyncitmf/services/profile_store.py` (`list_profiles`, `PROFILES_DIR`) vs `src/rcsyncitmf/config.py` (`DEFAULT_SETTINGS["profiles_dir"]`)
-- **Descripción:** `profile_store` usa la constante `PROFILES_DIR` fija; `settings["profiles_dir"]` se muestra pero no se honra. Si se modifica manualmente en `settings.toml`, la app lo ignora.
-- **Impacto:** Baja (no editable desde UI), pero inconsistencia de configuración.
+### 5.3 🟠 Medium — `profiles_dir` de settings no se honra
 
-### 4.5 🟡 Mensajería inconsistente en sincronización de unions
+- **Archivos:** `src/rcsyncitmf/services/profile_store.py` (`list_profiles`, constante `PROFILES_DIR`) vs `src/rcsyncitmf/config.py` (`DEFAULT_SETTINGS["profiles_dir"]`)
+- **Descripción:** `profile_store` usa la constante fija `PROFILES_DIR`; `settings["profiles_dir"]` se muestra en Ajustes pero no se usa. Modificarlo manualmente en `settings.toml` se ignora.
+- **Impacto:** baja (no editable desde UI), pero inconsistencia de configuración.
 
-- **Archivo:** `src/rcsyncitmf/ui/pages/unions_page.py` (`_show_preview`, `_on_sync`)
-- **Descripción:** La vista previa anuncia “Modo: espejo bidireccional (creación + borrado)”, pero `_on_sync` fuerza `delete_enabled=False` y `allow_delete=False`, por lo que nunca se propagan borrados desde la UI. Además, las etiquetas de botones en `_toggle_mount` usan strings sin traducir (“Montando…”, “Desmontar”, “Montar”).
-- **Impacto:** Confusión de usuario; deletes del plan siempre vacíos.
+### 5.4 🟠 Medium — Desajuste de mountpoint en el fallback de `mount()`
 
-### 4.6 🟡 `AutoSyncManager` siempre en modo “solo creación”
+- **Archivo:** `src/rcsyncitmf/services/mount_manager.py` (`mount`, bloque `except (OSError, PermissionError)`)
+- **Descripción:** Si `mkdir` falla, `mount()` reasigna `mountpoint` a una ruta bajo `~/.local/share/rcsyncitmf/mnt/...` y persiste esa nueva ruta en `mounts.toml`. Sin embargo, la UI (`RemotesPage._toggle_mount`, `UnionsPage._toggle_mount`) ignora el valor devuelto por `mount()` y sigue usando la ruta original capturada (`mp`) en los callbacks `ok_mount`, por lo que el botón/etiqueta puede quedar con la ruta antigua. `do_mount` retorna `mp` (original), no el mountpoint efectivo.
+- **Impacto:** ruta mostrada incorrecta cuando se usa el fallback (poco frecuente, solo con permisos insuficientes).
+
+### 5.5 🟡 Low — `profile_detail` no invalida la caché de dump al borrar remotos
+
+- **Archivo:** `src/rcsyncitmf/ui/dialogs/profile_detail.py` (`_delete_remote`)
+- **Descripción:** Llama a `rclone.delete_remote` pero no invoca `mount_manager._invalidate_profile_dump_cache(self.profile)`. La caché de dump (TTL 15 s) puede devolver datos obsoletos en `MountsPage`/`RemotesPage` tras borrar un remoto. Otros puntos de mutación (`remote_dialog`, `union_dialog`, `profile_store`) sí invalidan.
+- **Impacto:** datos obsoletos hasta 15 s tras borrar un remoto desde el detalle del perfil.
+
+### 5.6 🟡 Low — Cadenas sin traducir (i18n incompleta)
+
+- **Archivos:** `src/rcsyncitmf/window.py` (`check_default_rclone_config`, `_menu_shortcuts`, `stack.add_titled(..., "settings", "Ajustes")`), `src/rcsyncitmf/ui/pages/unions_page.py` (`_toggle_mount` ya traducido parcialmente, notas de `action_policy` hardcodeadas en español), `src/rcsyncitmf/ui/pages/mounts_page.py` (etiqueta `(crypt sobre {parent})`), `src/rcsyncitmf/application.py` (mensajes ya traducidos en su mayoría).
+- **Descripción:** Varias cadenas quedan en español aun con idioma `en`, y el título de la página de Ajustes en el stack no usa `_()`.
+- **Impacto:** experiencia inconsistente en inglés.
+
+### 5.7 🟡 Low — `FilesPage` carrera de token en caché
+
+- **Archivo:** `src/rcsyncitmf/ui/pages/files_page.py` (`_list`)
+- **Descripción:** El token `_list_token` se verifica al inicio de `ok()`, pero la escritura a `_list_cache` ocurre después de ordenar/filtrar. Si la invalidación ocurre entre el guard y la asignación, la caché puede quedar con datos de una petición obsoleta. Riesgo bajo.
+- **Además:** tras `_download` no se invalida caché (correcto, no modifica listado), pero `_open_file` descarga a un directorio temporal que no se limpia.
+
+### 5.8 🟡 Low — `RemoteDialog` no permite borrar valores en edición
+
+- **Archivo:** `src/rcsyncitmf/ui/dialogs/remote_dialog.py` (`_collect_opts`, `_on_response`)
+- **Descripción:** En edición, los campos con valor vacío se omiten de `opts`, por lo que `merged` conserva el valor anterior. No es posible vaciar un campo existente desde la UI (solo añadir/cambiar).
+- **Impacto:** edición limitada; menor.
+
+### 5.9 🟡 Low — Versión hardcodeada en el diálogo “Acerca de”
+
+- **Archivo:** `src/rcsyncitmf/window.py` (`_menu_about`): `dlg.set_version("1.0.0")` en lugar de usar `__version__`.
+- **Impacto:** si se cambia la versión en `pyproject.toml`, la UI no se actualiza automáticamente.
+
+### 5.10 🟡 Low — `AutoSyncManager` siempre en modo “solo creación”
 
 - **Archivo:** `src/rcsyncitmf/services/auto_sync.py` (`_cycle`)
-- **Descripción:** Llama a `build_mirror_plan(..., allow_delete=False, max_deletions=0)` y `apply_plan(..., delete=False)`. Coherente con seguridad, pero el mensaje de la UI sugiere lo contrario. Documentar o alinear.
-
-### 4.7 🟡 Race/consistencia en `FilesPage._list`
-
-- **Archivo:** `src/rcsyncitmf/ui/pages/files_page.py`
-- **Descripción:** El token de invalidación (`_list_token`) se incrementa y se captura en `fetch`. Sin embargo, la caché (`_list_cache`) se escribe en `ok()` sin verificar si el token sigue vigente antes de la asignación (sí se verifica al inicio de `ok`, pero la escritura ocurre después de ordenar). En la práctica el guard `if token != self._list_token: return` está al inicio, por lo que es razonable, pero la caché puede quedar con datos de una petición obsoleta si la invalidación ocurre entre el guard y la asignación. Riesgo bajo.
-- **Además:** `_invalidate_cache` no se llama tras `_upload`/`_download` (solo en `_new_folder`, `_delete`, `_rename`, `_copy`, `_move`). Subir/descargar archivos no invalida la caché del directorio actual, por lo que la vista puede quedar desactualizada.
-
-### 4.8 🟡 `mount_manager._dump_for_profile` crea event loop en hilo arbitrario
-
-- Como en 4.2; además el caché `_PROFILE_DUMP_CACHE` (TTL 15s) no se invalida al cambiar perfiles/remotos, por lo que `crypt_parent`/`related_cache_remotes` pueden devolver datos obsoletos hasta 15s.
-
-### 4.9 🟡 `is_mounted` en Flatpak hace dos subprocess por llamada
-
-- **Archivo:** `src/rcsyncitmf/services/mount_manager.py` (`is_mounted`)
-- **Descripción:** Primero `flatpak-spawn --host mountpoint`, y si falla, `cat /proc/mounts`. En bucles de UI (MountsPage.refresh, FilesPage) se llama repetidamente. Rendimiento aceptable pero mejorable con caché.
-
-### 4.10 🟡 `ProfilesPage._on_toggle_encrypt` bloquea UI
-
-- Llama a `profile_store.is_encrypted` (síncrono) en el hilo principal. Ver 4.2.
+- **Descripción:** Llama a `build_mirror_plan(..., allow_delete=False, max_deletions=0)` y `apply_plan(..., delete=False)`. Coherente con seguridad, pero la UI/mensajes sugieren lo contrario. Documentar o alinear.
 
 ---
 
-## 5. Hallazgos de integración y diseño
+## 6. Integración y diseño
 
-### 5.1 Explorador de archivos incompleto para transferencias entre perfiles
+### 6.1 Explorador de archivos y transferencias entre perfiles
 
-`FilesPage` trabaja con **targets montados** (tuplas `(profile, remote)`), pero `_transfer_dialog` asume un único `self.profile` y una lista `self.remotes` inexistente. No hay forma de elegir remotos de otro perfil. Diseño a revisar.
+`FilesPage` trabaja con **targets montados** (tuplas `(profile, remote)`), y `_transfer_dialog` (Copiar/Mover) obtiene la lista de remotos del perfil activo de forma asíncrona (`_fetch_remotes_then`). Funciona para transferencias dentro del mismo perfil. No hay forma de elegir remotos de otro perfil ni targets montados de otros perfiles; diseño a revisar si se quiere transferencia cross-profile.
 
-### 5.2 `RemoteDialog` preserva campos no mostrados
+### 6.2 Edición de crypt remotes es “segura” pero limitada
 
-En edición, hace `merged = {k: v for k, v in base.items() if k != "type"}` y luego `merged.update(opts)` tras eliminar valores sin cambios. Esto es correcto para no re-ofuscar contraseñas, pero si un campo avanzado se elimina manualmente en el conf, el app lo mantiene (porque no está en `opts`). Comportamiento esperado en la mayoría de casos.
+Solo permite cambiar contraseñas; upstream y modo de cifrado son de solo lectura. Correcto para no corromper datos. Sin embargo, si un campo avanzado se elimina manualmente en el `.conf`, la app lo mantiene (porque no está en `opts`). Comportamiento esperado en la mayoría de casos.
 
-### 5.3 Edición de crypt remotes es “segura” pero limitada
+### 6.3 `mount()` no espera a que el daemon termine de montar
 
-Solo permite cambiar contraseñas; upstream y modo de cifrado son de solo lectura. Correcto para no corromper datos.
+`rclone mount --daemon` retorna cuando el proceso daemonizado arranca; `subprocess.run` con timeout 60. Luego la UI asume montado y consulta `is_mounted`. Aceptable, pero en redes lentas puede reportar “montado” antes de estar listo.
 
-### 5.4 `UnionDialog` no valida nombres duplicados
-
-Depende de `rclone create_remote` que fallará; el error se muestra vía toast. Aceptable.
-
-### 5.5 Auto-sync no notifica a la UI
-
-`AutoSyncManager._toast` es no-op real; `_toast` module-level busca la ventana activa. No se invoca en el ciclo. El auto-sync es silencioso (solo logs). Aceptable para daemon.
-
-### 5.6 `mount_manager.mount` fallback de mountpoint
-
-Si `mkdir` falla, reasigna `mountpoint` a `~/.local/share/rcsyncitmf/mnt/...`. El registro persistido usa la nueva ruta. Correcto, pero el caller (UI) puede seguir mostrando la ruta original en el botón (se pasa `mp` original al callback). En `RemotesPage._toggle_mount`, `ok_mount` recibe `_mp` (nuevo) y actualiza etiqueta con el nuevo mp. Bien. En `UnionsPage` similar.
-
-### 5.7 `mount` no espera a que el daemon termine de montar
-
-`rclone mount --daemon` retorna cuando el proceso daemonizado arranca; `subprocess.run` con timeout 60. Luego la UI asume montado. `is_mounted` se consulta después. Aceptable.
-
-### 5.8 Bookmarks GTK
+### 6.4 Bookmarks GTK
 
 Se añaden entradas a `gtk-3.0/bookmarks` y `gtk-4.0/bookmarks`. `cleanup_bookmarks` elimina entradas cuyo path no está montado. Correcto.
 
+### 6.5 `mount_manager.is_mounted` hace dos subprocess por llamada en Flatpak
+
+Se llama repetidamente en bucles de UI (`MountsPage.refresh`, `FilesPage._load_mounted_targets`, `RemotesPage._load_remotes_for`, `UnionsPage._add_union_row`). Rendimiento aceptable pero mejorable con caché/memoización.
+
 ---
 
-## 6. Seguridad (observaciones, delegar a Security agent)
+## 7. Seguridad (observaciones; delegar a Security agent)
 
 - Contraseñas de perfiles cifrados se mantienen **solo en memoria** (`_PASSWORD_CACHE`), nunca persistidas. ✅
 - `RCLONE_CONFIG_PASS` se pasa por entorno, no por argv. ✅
-- `unmount` no borra el mountpoint si el desmontaje falla. ✅ (evita pérdida de datos)
+- `unmount` no borra el mountpoint si el desmontaje falla. ✅
 - `mount_manager.is_mounted` en Flatpak evita interpolación de shell (usa argv). ✅
-- **Pendiente de revisión (Security agent):** validación de nombres de perfil/remoto (path traversal), permisos de archivos de config, exposición de puertos (no hay `serve`/`rcd` actualmente), manejo de `--allow-other` y `/etc/fuse.conf`.
-- **Pendiente:** `remote_dialog` envía opciones a rclone tal cual; no se sanitizan valores con saltos de línea o caracteres de control. Riesgo bajo (config local).
+- `unmount` usa lista de comandos (sin shell). ✅
+- **Pendiente de revisión (Security agent):**
+  - Validación de nombres de perfil/remoto (path traversal). `create_profile` valida `/` y prefijo `.`; `import_profile_unique` copia por nombre; pero los nombres de remoto/union no se validan contra `..` o caracteres de control.
+  - Permisos de archivos de config (`.conf`, `.meta.toml`, `mounts.toml`) — no se ajustan explícitamente (umask del proceso).
+  - Exposición de puertos: no hay `serve`/`rcd` actualmente, por lo que la superficie es baja.
+  - Manejo de `--allow-other` y `/etc/fuse.conf` (permisos de otros usuarios).
+  - `remote_dialog` envía opciones a rclone tal cual; no se sanitizan valores con saltos de línea o caracteres de control. Riesgo bajo (config local).
+  - `mount()` fallback usa `profile.stem` y `remote` como componentes de ruta sin sanitización; un nombre malicioso podría escapar del directorio base. Riesgo bajo (nombres provienen de config local).
 
 ---
 
-## 7. Internacionalización
+## 8. Internacionalización
 
 - Solo `es` y `en`; `_resolve_language` devuelve `es` por defecto.
-- Muchas cadenas en `_toggle_mount` (UnionsPage) y en `mounts_page` están sin `_()` (hardcoded en español). Inconsistencia menor.
+- Muchas cadenas en `UnionsPage`, `MountsPage` y `window.py` están sin `_()` (hardcoded en español). Inconsistencia menor/media.
 - `SettingsPage` idioma requiere reinicio (documentado en diálogo).
 
 ---
 
-## 8. Flatpak
+## 9. Flatpak
 
 - Manifest runtime GNOME 51, permisos: ipc, x11/wayland, dri, all devices, network, home, xdg-config/cache, talk org.freedesktop.Flatpak. ✅ alineado con README.
 - `install.sh` usa `pipx` o `pip --user`. ✅
 - `rclone` se ejecuta vía `flatpak-spawn --host`. ✅
 - `default_mountpoint` en Flatpak usa `~/.local/share/rcsyncitmf/mnt` (compartido con host). ✅
+- `is_mounted` y `unmount` adaptados al sandbox. ✅
 
 ---
 
-## 9. Veredicto
+## 10. Veredicto
 
-**Verdict: `approve with nits`** con **un bug funcional bloqueante** (4.1) que debe corregirse antes de release.
+**Verdict: `approve with nits`** (sin blockers funcionales abiertos tras la iteración anterior).
 
-### Blockers
-1. `FilesPage._transfer_dialog` → `AttributeError: self.remotes` (Copiar/Mover rotos).
+### Pendientes recomendados (no blockers)
 
-### High priority (no blockers pero recomendados)
-2. Mover llamadas síncronas a rclone (`_ensure_dump`, `_dump_for_profile`, `is_encrypted`) a `run_async` o caché con carga lazy.
-3. Invalidar caché de directorio tras upload/download en FilesPage.
-4. Alinear mensajería de sync (bidireccional vs solo creación) o habilitar borrados explícitamente.
-5. Invalidar `_RCLONE_BIN_CACHE` al cambiar ajustes.
-
-### Medium/Low
-6. Honrar `settings["profiles_dir"]` o eliminarlo de settings.
-7. Traducir strings hardcoded en UnionsPage/MountsPage.
-8. Añadir tests para `rclone.py`, `sync_state.py`, `config.py`, `remote_dialog` (lógica de collect_opts), `files_page` (transfer).
-9. Invalidar `_PROFILE_DUMP_CACHE` al modificar perfiles.
+1. Mover llamadas síncronas a rclone (`RemoteDialog._ensure_dump`, `profile_store.is_encrypted` en `profile_detail`, `mount_manager._dump_for_profile`/`related_cache_remotes`, `rclone.list_providers`) a `run_async` o caché con carga lazy.
+2. Alinear mensajería de sync (bidireccional vs solo creación) o habilitar borrados explícitamente; quitar o deshabilitar el switch de Purge si no hay borrados.
+3. Honrar `settings["profiles_dir"]` o eliminarlo de settings.
+4. Corregir desajuste de mountpoint en el fallback de `mount()` (retornar/usar el mountpoint efectivo en la UI).
+5. Invalidar caché de dump en `profile_detail._delete_remote`.
+6. Traducir cadenas hardcodeadas en `window.py`, `unions_page.py`, `mounts_page.py`.
+7. Usar `__version__` en el diálogo “Acerca de”.
+8. Añadir tests para `rclone.py`, `sync_state.py`, `config.py`, `remote_dialog` (lógica de `_collect_opts`), `files_page` (transfer), `profile_detail`.
 
 ---
 
-## 10. Próximos pasos
+## 11. Próximos pasos
 
 - Ejecutar **quality agent** para linting/formatting/análisis estático adicional.
 - Ejecutar **security agent** para escaneo de vulnerabilidades y patrones de seguridad.
-- Corregir el blocker 4.1 y los high-priority antes de merge a `main`.
+- Corregir los pendientes de alta prioridad antes de merge a `main`.
 
 ---
 
-## 10b. Correcciones aplicadas en esta iteración
+## 12. Actualización post-implementación (Fases 0–9)
 
-- **Blocker 4.1:** `FilesPage` ahora inicializa `self.remotes` y obtiene la lista de remotos del perfil activo de forma asíncrona antes de abrir el diálogo de transferencia (`_fetch_remotes_then`), evitando `AttributeError` en Copiar/Mover.
-- **4.7:** `FilesPage` invalida la caché tras operaciones que modifican el directorio (ya aplicado en upload/delete/rename/new folder).
-- **4.3:** Nueva función `rclone.invalidate_rclone_bin_cache()` invocada desde `SettingsPage._apply`.
-- **4.5/4.6:** Mensaje de vista previa alineado con el comportamiento real (solo creaciones); strings de montaje traducidos en `UnionsPage`.
-- **4.8:** `MountsPage.refresh` ahora calcula el conjunto de crypt parents de forma asíncrona (`async_crypt_parents_with_cache`, `async_crypt_parent_map`), evitando bloqueos del hilo de UI.
-- **4.2/4.10:** `ProfilesPage` usa `encrypted_flag` (no bloqueante) en lugar de `is_encrypted`.
-- **Invalidación de caché:** `_invalidate_profile_dump_cache` se invoca en mutaciones de perfiles/remotos/unions.
+Se aplicaron las correcciones de las Fases 1–7 y se amplió la suite de tests (Fase 8).
 
-## 11. Anexo: comandos de verificación ejecutados
+- Fase 1: `RemoteDialog._ensure_dump`, `list_providers`, `profile_detail` y `mount_manager` sin bloqueos de UI.
+- Fase 2: mensajería de sync de unions alineada (solo creaciones).
+- Fase 3: `profiles_dir` de settings honrado.
+- Fase 4: mountpoint efectivo en fallback de `mount()`.
+- Fase 5: invalidación de caché en `profile_detail._delete_remote`.
+- Fase 6: cadenas hardcodeadas envueltas en `_()`.
+- Fase 7: `__version__`, cleanup de temporales, guard de token en caché, vaciado de campos en edición.
+- Fase 8: +9 tests (sync_state, config, rclone básico, remote_dialog, files_page). Total 31 tests.
+
+Verificación final:
 
 ```
 $ .venv/bin/python -m pytest -q
-20 passed in 0.05s
+31 passed in 0.13s
+
+$ .venv/bin/ruff check src tests
+All checks passed!
+
+$ .venv/bin/mypy src/rcsyncitmf
+Success: no issues found in 27 source files
+```
+
+## 13. Anexo: comandos de verificación ejecutados
+
+```
+$ .venv/bin/python -m pytest -q
+22 passed in 0.04s
 
 $ .venv/bin/ruff check src tests
 All checks passed!

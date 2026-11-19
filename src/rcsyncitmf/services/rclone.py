@@ -230,8 +230,12 @@ async def purge(config: Path, remote: str, path: str) -> None:
     await run(["purge", f"{remote}:{path}"], config=config)
 
 
-def list_providers() -> list[dict]:
-    """Return rclone's config providers (synchronously, fast)."""
+_PROVIDERS_CACHE: list[dict] | None = None
+_PROVIDERS_LOCK = __import__("threading").Lock()
+
+
+def _load_providers_sync() -> list[dict]:
+    """Synchronous implementation of ``list_providers`` (may block)."""
     import json as _json
     import subprocess as _subprocess
 
@@ -253,6 +257,38 @@ def list_providers() -> list[dict]:
     except Exception:
         pass
     return []
+
+
+def list_providers() -> list[dict]:
+    """Return rclone's config providers (cached; may block on first call)."""
+    global _PROVIDERS_CACHE
+    with _PROVIDERS_LOCK:
+        if _PROVIDERS_CACHE is not None:
+            return _PROVIDERS_CACHE
+    data = _load_providers_sync()
+    with _PROVIDERS_LOCK:
+        if _PROVIDERS_CACHE is None:
+            _PROVIDERS_CACHE = data
+    return _PROVIDERS_CACHE
+
+
+async def async_list_providers() -> list[dict]:
+    """Non-blocking variant of ``list_providers``."""
+    global _PROVIDERS_CACHE
+    with _PROVIDERS_LOCK:
+        if _PROVIDERS_CACHE is not None:
+            return _PROVIDERS_CACHE
+    data = await asyncio.to_thread(_load_providers_sync)
+    with _PROVIDERS_LOCK:
+        if _PROVIDERS_CACHE is None:
+            _PROVIDERS_CACHE = data
+    return _PROVIDERS_CACHE
+
+
+def invalidate_providers_cache() -> None:
+    global _PROVIDERS_CACHE
+    with _PROVIDERS_LOCK:
+        _PROVIDERS_CACHE = None
 
 
 _RCLONE_BIN_CACHE: dict[str, str] = {}

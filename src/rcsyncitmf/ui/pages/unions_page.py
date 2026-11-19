@@ -364,18 +364,19 @@ class UnionsPage(Gtk.Box):
             btn.set_label(_("Montando..."))
 
             async def do_mount():
-                await mount_manager.mount(profile, name, mp)
-                return mp
+                rec = await mount_manager.mount(profile, name, mp)
+                eff = rec.get("mountpoint") if isinstance(rec, dict) else None
+                return Path(eff) if eff else mp
 
             def ok_mount(_mp):
                 btn.set_sensitive(True)
                 btn.set_label(_("Desmontar"))
                 btn.remove_css_class("suggested-action")
                 btn.add_css_class("destructive-action")
-                self.window.toast(f"Montado en {mp}")
+                self.window.toast(f"Montado en {_mp}")
                 self.refresh()
                 try:
-                    mount_manager.open_in_file_manager(mp)
+                    mount_manager.open_in_file_manager(_mp)
                 except Exception as exc:
                     self.window.toast(f"Error abriendo: {exc}")
 
@@ -532,10 +533,14 @@ class UnionsPage(Gtk.Box):
         purge_box.append(purge_label)
         purge_switch = Gtk.Switch()
         purge_switch.set_active(False)
+        purge_switch.set_sensitive(False)
         purge_switch.set_halign(Gtk.Align.END)
+        purge_switch.set_tooltip_text(
+            _("Sin efecto: esta sincronización solo propaga creaciones.")
+        )
         purge_box.append(purge_switch)
         purge_help = Gtk.Label(
-            label=_("Activa para borrar directorios con contenido; desactivado solo borra vacíos."),
+            label=_("Deshabilitado: esta sincronización solo propaga creaciones."),
             xalign=0,
         )
         purge_help.add_css_class("dim-label")
@@ -544,28 +549,18 @@ class UnionsPage(Gtk.Box):
         outer.append(purge_help)
 
         # Inform the user how deletions are handled.
-        ap = None
         for u in self.unions:
             if u["name"] == union_name:
-                ap = u["data"].get("action_policy", "")
                 break
-        if ap not in ("epall", "all"):
-            note = Gtk.Label(
-                label=f"action_policy='{ap}': los borrados NO se propagan a todos los upstreams. "
-                "Usa 'epall' o 'all' para propagación automática.",
-                xalign=0,
-            )
-            note.add_css_class("dim-label")
-            note.add_css_class("error")
-            outer.append(note)
-        else:
-            note = Gtk.Label(
-                label="Los borrados se propagan automáticamente según action_policy (epall/all). "
-                "Esta sincronización solo propaga creaciones faltantes.",
-                xalign=0,
-            )
-            note.add_css_class("dim-label")
-            outer.append(note)
+        note = Gtk.Label(
+            label=_(
+                "Esta sincronización solo propaga creaciones faltantes. "
+                "Los borrados están deshabilitados por seguridad (independientemente de action_policy)."
+            ),
+            xalign=0,
+        )
+        note.add_css_class("dim-label")
+        outer.append(note)
 
         dlg.set_extra_child(outer)
         dlg.add_response("cancel", _("Cancelar"))
