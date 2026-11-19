@@ -197,17 +197,18 @@ class RemotesPage(Gtk.Box):
             # keep button label; spinner as tooltip not added to avoid layout changes
 
             async def do_mount():
-                await mount_manager.mount(profile, name, mp)
-                return mp
+                rec = await mount_manager.mount(profile, name, mp)
+                eff = rec.get("mountpoint") if isinstance(rec, dict) else None
+                return Path(eff) if eff else mp
 
             def ok_mount(_mp):
                 btn.set_sensitive(True)
                 btn.set_label(_(_("Desmontar")))
                 btn.remove_css_class("suggested-action")
                 btn.add_css_class("destructive-action")
-                self.window.toast(_("Montado en {mp}").format(mp=mp))
+                self.window.toast(_("Montado en {mp}").format(mp=_mp))
                 try:
-                    mount_manager.open_in_file_manager(mp)
+                    mount_manager.open_in_file_manager(_mp)
                 except Exception as exc:
                     self.window.toast(_("Error abriendo: {exc}").format(exc=exc))
 

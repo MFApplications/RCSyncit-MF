@@ -15,20 +15,51 @@ _META_LOCK = threading.RLock()
 _PASSWORD_LOCK = threading.RLock()
 
 
+def profiles_dir() -> Path:
+    """Resolve the effective profiles directory.
+
+    Honours an explicit ``profiles_dir`` entry in ``settings.toml`` (only when
+    the settings file actually contains the key, so defaults/monkeypatched
+    test paths keep working). Falls back to the module-level ``PROFILES_DIR``.
+    """
+    try:
+        import tomllib
+
+        from ..config import APP_DIR
+
+        settings_file = APP_DIR / "settings.toml"
+        if settings_file.exists():
+            with settings_file.open("rb") as f:
+                data = tomllib.load(f)
+            if isinstance(data, dict) and "profiles_dir" in data:
+                raw = str(data.get("profiles_dir") or "").strip()
+                if raw:
+                    p = Path(raw).expanduser()
+                    p.mkdir(parents=True, exist_ok=True)
+                    return p
+    except Exception:
+        pass
+    import contextlib
+
+    with contextlib.suppress(OSError):
+        PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+    return PROFILES_DIR
+
+
 def list_profiles() -> list[Path]:
-    ensure_dirs()
-    return sorted(PROFILES_DIR.glob("*.conf"))
+    base = profiles_dir()
+    return sorted(base.glob("*.conf"))
 
 
 def create_profile(name: str) -> Path:
     """Create an empty rclone config file. Raises FileExistsError if present."""
-    ensure_dirs()
+    base = profiles_dir()
     safe = name.strip()
     if not safe or "/" in safe or safe.startswith("."):
         raise ValueError(_("invalid profile name"))
     if not safe.endswith(".conf"):
         safe = safe + ".conf"
-    path = PROFILES_DIR / safe
+    path = base / safe
     if path.exists():
         raise FileExistsError(safe)
     path.write_text("", encoding="utf-8")
@@ -47,26 +78,26 @@ def delete_profile(path: Path) -> None:
 
 
 def import_profile(src: Path) -> Path:
-    ensure_dirs()
-    dst = PROFILES_DIR / src.name
+    base = profiles_dir()
+    dst = base / src.name
     if not src.name.endswith(".conf"):
-        dst = PROFILES_DIR / (src.name + ".conf")
+        dst = base / (src.name + ".conf")
     shutil.copyfile(src, dst)
     return dst
 
 
 def import_profile_unique(src: Path) -> Path:
     """Import a profile, renaming if a file with the same name already exists."""
-    ensure_dirs()
+    base_dir = profiles_dir()
     base = src.stem
     if not base:
         base = "profile"
-    candidate = PROFILES_DIR / f"{base}.conf"
+    candidate = base_dir / f"{base}.conf"
     if candidate.exists():
         i = 1
-        while (PROFILES_DIR / f"{base}-{i}.conf").exists():
+        while (base_dir / f"{base}-{i}.conf").exists():
             i += 1
-        candidate = PROFILES_DIR / f"{base}-{i}.conf"
+        candidate = base_dir / f"{base}-{i}.conf"
     shutil.copyfile(src, candidate)
     try:
         from . import mount_manager
@@ -92,7 +123,7 @@ def rename_profile(path: Path, new_name: str) -> Path:
         raise ValueError(_("invalid profile name"))
     if not safe.endswith(".conf"):
         safe = safe + ".conf"
-    dst = PROFILES_DIR / safe
+    dst = profiles_dir() / safe
     if dst.exists() and dst != path:
         raise FileExistsError(safe)
     path.rename(dst)

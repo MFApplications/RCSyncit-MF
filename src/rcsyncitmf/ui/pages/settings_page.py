@@ -66,10 +66,14 @@ class SettingsPage(Gtk.Box):
 
         storage_group = Adw.PreferencesGroup(title=_("Almacenamiento"))
         general_page.add(storage_group)
-        self.profiles_row = Adw.ActionRow()
-        self.profiles_row.set_title(_("Directorio de perfiles"))
-        self.profiles_row.set_subtitle(str(self.settings.get("profiles_dir")))
-        storage_group.add(self.profiles_row)
+        self.profiles_dir_row = Adw.EntryRow()
+        self.profiles_dir_row.set_title(_("Directorio de perfiles"))
+        self.profiles_dir_row.set_text(str(self.settings.get("profiles_dir", "")))
+        browse_btn = Gtk.Button(label=_("Examinar"))
+        browse_btn.add_css_class("flat")
+        browse_btn.connect("clicked", self._browse_profiles_dir)
+        self.profiles_dir_row.add_suffix(browse_btn)
+        storage_group.add(self.profiles_dir_row)
 
         mounts_group = Adw.PreferencesGroup(title=_("Mounts"))
         general_page.add(mounts_group)
@@ -241,6 +245,19 @@ class SettingsPage(Gtk.Box):
         btn_box.append(apply_btn)
         self.append(btn_box)
 
+    def _browse_profiles_dir(self, _btn=None) -> None:
+        dialog = Gtk.FileDialog(title=_("Seleccionar directorio de perfiles"))
+
+        def on_folder(d, res):
+            try:
+                folder = d.select_folder_finish(res)
+            except Exception:
+                return
+            if folder is not None and folder.get_path():
+                self.profiles_dir_row.set_text(folder.get_path())
+
+        dialog.select_folder(self.window, None, on_folder)
+
     def _browse_mounts_dir(self, _btn=None) -> None:
         dialog = Gtk.FileDialog(title=_("Seleccionar directorio de mounts"))
 
@@ -281,6 +298,12 @@ class SettingsPage(Gtk.Box):
         self.settings["concurrency"] = int(self.concurrency_row.get_value())
         self.settings["sync_depth"] = int(self.depth_row.get_value())
         self.settings["rclone_bin"] = self.rclone_bin_row.get_text().strip() or "rclone"
+        raw_profiles = self.profiles_dir_row.get_text().strip()
+        if not raw_profiles:
+            from ...config import PROFILES_DIR as _DEFAULT_PROFILES_DIR
+
+            raw_profiles = str(_DEFAULT_PROFILES_DIR)
+        self.settings["profiles_dir"] = raw_profiles
         if self.mounts_default_switch.get_active():
             self.settings["mounts_dir"] = ""
         else:

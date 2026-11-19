@@ -291,6 +291,8 @@ class FilesPage(Gtk.Box):
             items = unique
             # dirs first, then files
             items = sorted(items, key=lambda x: (not bool(x.get("IsDir")), str(x.get("Name", ""))))
+            if token != self._list_token:
+                return
             self._list_cache[cache_key] = list(items)
             for it in items:
                 self._add_row(it)
@@ -500,6 +502,16 @@ class FilesPage(Gtk.Box):
 
         def ok(_result):
             self._launch_local(local_dest)
+            # Clean up the temporary download directory after a grace period.
+            import shutil
+
+            from gi.repository import GLib
+
+            def _cleanup() -> bool:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                return False
+
+            GLib.timeout_add_seconds(120, _cleanup)
 
         def err(exc):
             self._toast(_("Error abriendo: {exc}").format(exc=exc))

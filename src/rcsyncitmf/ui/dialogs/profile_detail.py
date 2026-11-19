@@ -196,15 +196,7 @@ class ProfileDetailDialog(Adw.Dialog):
                 self.accounts_list.append(row)
 
         def err(exc):
-            from ...services import profile_store
-
-            if (
-                profile_store.is_encrypted(self.profile)
-                and profile_store.get_cached_password(self.profile) is None
-            ):
-                self.window.ask_profile_password(self.profile, lambda _p: self._load_accounts())
-            else:
-                self.window.toast(_("Error: {exc}").format(exc=exc))
+            self.window.toast(_("Error: {exc}").format(exc=exc))
 
         run_async(fetch(), on_success=ok, on_error=err)
 
@@ -250,6 +242,12 @@ class ProfileDetailDialog(Adw.Dialog):
                     await rclone.delete_remote(self.profile, name)
 
                 def ok(_result):
+                    try:
+                        from ...services import mount_manager
+
+                        mount_manager._invalidate_profile_dump_cache(self.profile)
+                    except Exception:
+                        pass
                     self.window.toast(f"Eliminado {name}")
                     self._load_accounts()
 
@@ -539,7 +537,12 @@ class ProfileDetailDialog(Adw.Dialog):
         self.allow_other_row.set_active(bool(vfs.get("allow_other", False)))
         self.network_mode_row.set_active(bool(vfs.get("network_mode", False)))
         self.attr_timeout_row.set_value(float(vfs.get("attr_timeout", 1)))
-        self.vfs_read_ahead_row.set_value(float(vfs.get("vfs_read_ahead", 0)))
+        _raw_read_ahead = vfs.get("vfs_read_ahead", "0M")
+        if isinstance(_raw_read_ahead, (int, float)):
+            _read_ahead_val = float(_raw_read_ahead)
+        else:
+            _read_ahead_val = float(self._size_to_mb(str(_raw_read_ahead), 0))
+        self.vfs_read_ahead_row.set_value(_read_ahead_val)
         self.vfs_fast_fingerprint_row.set_active(bool(vfs.get("vfs_fast_fingerprint", False)))
 
     def _save_vfs(self) -> None:
