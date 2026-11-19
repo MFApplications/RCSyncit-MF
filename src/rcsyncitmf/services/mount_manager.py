@@ -587,6 +587,53 @@ def _all_profile_dumps() -> list[tuple[Path, dict]]:
     return out
 
 
+async def async_dump_for_profile(profile: Path) -> dict:
+    key = str(profile)
+    now = time.monotonic()
+    with _PROFILE_DUMP_LOCK:
+        entry = _PROFILE_DUMP_CACHE.get(key)
+        if entry is not None and now - entry[0] < _DUMP_TTL:
+            return entry[1]
+    try:
+        from . import profile_store, rclone
+
+        pwd = profile_store.get_cached_password(profile)
+        dump = await rclone.config_dump(profile, config_password=pwd)
+    except Exception:
+        dump = {}
+    if not isinstance(dump, dict):
+        dump = {}
+    with _PROFILE_DUMP_LOCK:
+        _PROFILE_DUMP_CACHE[key] = (time.monotonic(), dump)
+    return dump
+
+
+async def async_related_cache_remotes(remote: str) -> list[str]:
+    group = {remote}
+    dumps = []
+    try:
+        from . import profile_store
+
+        for profile in profile_store.list_profiles():
+            try:
+                dump = await async_dump_for_profile(profile)
+            except Exception:
+                continue
+            dumps.append((profile, dump))
+    except Exception:
+        pass
+    for _profile, dump in dumps:
+        for name, data in (dump or {}).items():
+            if not (isinstance(data, dict) and data.get("type") == "crypt"):
+                continue
+            parent = str(data.get("remote", "")).rstrip(":").strip()
+            if name == remote and parent:
+                group.add(parent)
+            if parent == remote:
+                group.add(name)
+    return sorted(group)
+
+
 def crypt_parent(remote: str) -> str | None:
     """Return the underlying remote if *remote* is a crypt, else None."""
     for _profile, dump in _all_profile_dumps():
@@ -616,7 +663,7 @@ def related_cache_remotes(remote: str) -> list[str]:
 
 
 async def clear_vfs_cache(remote: str) -> None:
-    targets = related_cache_remotes(remote)
+    targets = await async_related_cache_remotes(remote)
 
     def _remove():
         import shutil

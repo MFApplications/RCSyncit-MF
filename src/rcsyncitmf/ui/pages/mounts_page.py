@@ -179,7 +179,7 @@ class MountsPage(Gtk.Box):
             else mount_manager.crypt_parent(remote)
         )
         if parent:
-            crypt_label = Gtk.Label(label=f"(crypt sobre {parent})", xalign=0)
+            crypt_label = Gtk.Label(label=_("crypt sobre {parent}").format(parent=parent), xalign=0)
             crypt_label.add_css_class("dim-label")
             crypt_label.add_css_class("caption")
             info.append(crypt_label)
@@ -318,7 +318,7 @@ class MountsPage(Gtk.Box):
             else mount_manager.crypt_parent(remote)
         )
         if parent:
-            crypt_label = Gtk.Label(label=f"(crypt sobre {parent})", xalign=0)
+            crypt_label = Gtk.Label(label=_("crypt sobre {parent}").format(parent=parent), xalign=0)
             crypt_label.add_css_class("dim-label")
             crypt_label.add_css_class("caption")
             info.append(crypt_label)
