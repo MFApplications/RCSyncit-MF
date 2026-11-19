@@ -198,6 +198,13 @@ async def mount(
     if vfs.get("umask") is not None:
         args += ["--umask", str(vfs["umask"])]
 
+    # Persist the effective rclone command for diagnostics.
+    try:
+        with open(log_path, "a", encoding="utf-8") as _lf:
+            _lf.write("COMMAND: " + " ".join(args) + "\n")
+    except OSError:
+        pass
+
     # Mount options (Fase A)
     if vfs.get("read_only"):
         args += ["--read-only"]

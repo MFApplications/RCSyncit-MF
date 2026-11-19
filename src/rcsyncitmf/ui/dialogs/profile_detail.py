@@ -565,7 +565,7 @@ class ProfileDetailDialog(Adw.Dialog):
             "vfs_fast_fingerprint": bool(self.vfs_fast_fingerprint_row.get_active()),
         }
         profile_store.save_meta(self.profile, meta)
-        self.window.toast(_("Opciones VFS guardadas"))
+        self.window.toast(_("Opciones VFS guardadas. Remonta para aplicar."))
         self.close()
 
     def _reset_vfs(self) -> None:

@@ -329,7 +329,7 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_logo(texture)
             except Exception:
                 pass
-        dlg.set_version("0.1.0")
+        dlg.set_version("1.0.0")
         dlg.set_developer_name("RCSyncitMF")
         dlg.set_comments(_("Gestor GNOME para rclone con multi-config y union sync."))
         dlg.present(self)
