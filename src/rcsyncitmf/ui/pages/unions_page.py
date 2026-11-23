@@ -167,26 +167,33 @@ class UnionsPage(Gtk.Box):
         btn_sync.connect("clicked", lambda _b, n=name: self._on_sync(n))
         top.append(btn_sync)
 
+        # La sincronización opera directamente sobre rclone y no requiere mount.
+        btn_sync.set_sensitive(True)
+        btn_sync.set_tooltip_text(_("Sincronizar estructura de carpetas (solo creación)"))
+
+        # Si el union tiene un crypt asociado, montar el crypt (no el union plano)
+        # para que el contenido se vea descifrado, igual que en la sección Remotos.
+        crypt_name = self._crypt_map.get(name)
+        mount_name = crypt_name if crypt_name else name
         mp = (
-            mount_manager.default_mountpoint(self._profile, name)
+            mount_manager.default_mountpoint(self._profile, mount_name)
             if self.profile is not None
-            else Path.home() / ".local" / "share" / "rcsyncitmf" / "mnt" / name
+            else Path.home() / ".local" / "share" / "rcsyncitmf" / "mnt" / mount_name
         )
         initially_mounted = mount_manager.is_mounted(mp)
-        btn_sync.set_sensitive(initially_mounted)
-        btn_sync.set_tooltip_text(
-            _("Disponible solo cuando el union está montado")
-            if not initially_mounted
-            else _("Sincronizar estructura de carpetas")
+        mount_label = (
+            _("Desmontar")
+            if initially_mounted
+            else (_("Montar (crypt)") if crypt_name else _("Montar"))
         )
-        btn_mount = Gtk.Button(label=(_("Desmontar") if initially_mounted else _("Montar")))
+        btn_mount = Gtk.Button(label=mount_label)
         if initially_mounted:
             btn_mount.add_css_class("destructive-action")
         else:
             btn_mount.add_css_class("suggested-action")
         btn_mount.connect(
             "clicked",
-            lambda _b, p=self._profile, n=name, b=btn_mount, m=mp: self._toggle_mount(p, n, b, m),
+            lambda _b, p=self._profile, n=mount_name, b=btn_mount, m=mp: self._toggle_mount(p, n, b, m),
         )
         top.append(btn_mount)
 
@@ -256,14 +263,16 @@ class UnionsPage(Gtk.Box):
             return
         u = self.unions[0]
         name = u["name"]
+        crypt_name = self._crypt_map.get(name)
+        mount_name = crypt_name if crypt_name else name
         mp = (
-            mount_manager.default_mountpoint(self._profile, name)
+            mount_manager.default_mountpoint(self._profile, mount_name)
             if self.profile is not None
-            else Path.home() / "mnt" / name
+            else Path.home() / "mnt" / mount_name
         )
 
         async def do():
-            await mount_manager.mount(self._profile, name, mp)
+            await mount_manager.mount(self._profile, mount_name, mp)
             return mp
 
         def ok(mp):
@@ -512,7 +521,6 @@ class UnionsPage(Gtk.Box):
             content.append(lb)
 
         build_op_list("Crear", plan.to_create, "list-add-symbolic", "success")
-        build_op_list("Borrar", plan.to_delete, "user-trash-symbolic", "error")
 
         if plan.errors:
             err_header = Gtk.Label(label=f"Errores ({len(plan.errors)})", xalign=0)
@@ -525,47 +533,14 @@ class UnionsPage(Gtk.Box):
                 lbl.set_wrap(True)
                 content.append(lbl)
 
-        # Purge option (recursive delete) chosen at apply time.
-        purge_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        purge_box.set_margin_top(8)
-        purge_label = Gtk.Label(label=_("Purge (borrado recursivo)"))
-        purge_box.append(purge_label)
-        purge_switch = Gtk.Switch()
-        purge_switch.set_active(False)
-        purge_switch.set_halign(Gtk.Align.END)
-        purge_box.append(purge_switch)
-        purge_help = Gtk.Label(
-            label=_("Activa para borrar directorios con contenido; desactivado solo borra vacíos."),
+        # Modo solo creación: no se propagan borrados.
+        note = Gtk.Label(
+            label=_("Esta sincronización solo crea carpetas faltantes en todos los upstreams; "
+                    "no borra nada."),
             xalign=0,
         )
-        purge_help.add_css_class("dim-label")
-        purge_help.add_css_class("caption")
-        outer.append(purge_box)
-        outer.append(purge_help)
-
-        # Inform the user how deletions are handled.
-        ap = None
-        for u in self.unions:
-            if u["name"] == union_name:
-                ap = u["data"].get("action_policy", "")
-                break
-        if ap not in ("epall", "all"):
-            note = Gtk.Label(
-                label=f"action_policy='{ap}': los borrados NO se propagan a todos los upstreams. "
-                "Usa 'epall' o 'all' para propagación automática.",
-                xalign=0,
-            )
-            note.add_css_class("dim-label")
-            note.add_css_class("error")
-            outer.append(note)
-        else:
-            note = Gtk.Label(
-                label="Los borrados se propagan automáticamente según action_policy (epall/all). "
-                "Esta sincronización solo propaga creaciones faltantes.",
-                xalign=0,
-            )
-            note.add_css_class("dim-label")
-            outer.append(note)
+        note.add_css_class("dim-label")
+        outer.append(note)
 
         dlg.set_extra_child(outer)
         dlg.add_response("cancel", _("Cancelar"))
@@ -576,7 +551,6 @@ class UnionsPage(Gtk.Box):
 
         def on_response(d, response):
             if response == "apply":
-                purge = purge_switch.get_active()
                 settings = load_settings()
                 concurrency = int(settings.get("concurrency", 4))
 
@@ -586,7 +560,7 @@ class UnionsPage(Gtk.Box):
                         plan,
                         concurrency=concurrency,
                         delete=delete_enabled,
-                        use_purge=purge,
+                        use_purge=False,
                     )
                     return errs
 
