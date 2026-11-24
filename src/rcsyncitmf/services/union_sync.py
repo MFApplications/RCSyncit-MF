@@ -247,6 +247,11 @@ async def apply_plan(
             try:
                 await mkdir(config, _remote_of(u), _join(_path_of(u), p))
             except Exception as exc:
+                low = str(exc).lower()
+                # Some backends report an error when the directory already exists;
+                # that is not a real failure for our create-only sync.
+                if "exist" in low:
+                    return
                 errors.append(_("mkdir {u}:{p}: {exc}").format(u=u, p=p, exc=exc))
 
     async def do_delete(u: str, p: str) -> None:
