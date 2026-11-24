@@ -42,7 +42,9 @@ class AutoSyncManager:
                     asyncio.run(self._cycle(settings))
                 except Exception:
                     logger.exception("auto-sync cycle failed")
-            wait = interval if interval > 0 else 300
+            # Re-check settings periodically even when disabled, so a later
+            # change to auto_sync_interval takes effect without restart.
+            wait = interval if interval > 0 else 60
             self._stop.wait(wait)
 
     async def _cycle(self, settings: dict) -> None:
