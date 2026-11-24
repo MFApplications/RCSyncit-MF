@@ -272,13 +272,14 @@ class UnionsPage(Gtk.Box):
         )
 
         async def do():
-            await mount_manager.mount(self._profile, mount_name, mp)
-            return mp
+            rec = await mount_manager.mount(self._profile, mount_name, mp)
+            eff = rec.get("mountpoint") if isinstance(rec, dict) else None
+            return Path(eff) if eff else mp
 
-        def ok(mp):
-            self.window.toast(f"Montado en {mp}")
+        def ok(_mp):
+            self.window.toast(f"Montado en {_mp}")
             try:
-                mount_manager.open_in_file_manager(mp)
+                mount_manager.open_in_file_manager(_mp)
             except Exception as exc:
                 self.window.toast(f"Error abriendo: {exc}")
 
