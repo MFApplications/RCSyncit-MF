@@ -45,5 +45,4 @@ modules:
     sources:
       - type: git
         url: https://github.com/MFApplications/RCSyncit-MF.git
-        tag: v1.1.1
-        commit: d331d71c916c085d3a0ae89e3db7834a5a6bd58a
+        tag: v1.1.3
