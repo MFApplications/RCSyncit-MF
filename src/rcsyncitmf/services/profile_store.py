@@ -69,10 +69,19 @@ def create_profile(name: str) -> Path:
 def delete_profile(path: Path) -> None:
     path.unlink(missing_ok=True)
     meta_path(path).unlink(missing_ok=True)
+    with _PASSWORD_LOCK:
+        _PASSWORD_CACHE.pop(str(path), None)
     try:
         from . import mount_manager
 
         mount_manager._invalidate_profile_dump_cache(path)
+        mount_manager.delete_profile_mounts(path)
+    except Exception:
+        pass
+    try:
+        from . import sync_state
+
+        sync_state.delete_profile(path)
     except Exception:
         pass
 
@@ -132,8 +141,19 @@ def rename_profile(path: Path, new_name: str) -> Path:
 
         mount_manager._invalidate_profile_dump_cache(path)
         mount_manager._invalidate_profile_dump_cache(dst)
+        mount_manager.rename_profile_mounts(path, dst)
     except Exception:
         pass
+    try:
+        from . import sync_state
+
+        sync_state.rename_profile(path, dst)
+    except Exception:
+        pass
+    # Migrate in-memory password cache alongside the profile.
+    with _PASSWORD_LOCK:
+        if str(path) in _PASSWORD_CACHE:
+            _PASSWORD_CACHE[str(dst)] = _PASSWORD_CACHE.pop(str(path))
     # Migrate metadata alongside the profile.
     old_meta = meta_path(path)
     new_meta = meta_path(dst)

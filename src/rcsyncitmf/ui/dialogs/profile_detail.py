@@ -70,11 +70,16 @@ class ProfileDetailDialog(Adw.Dialog):
 
         # Header
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        title = Gtk.Label(label=profile.stem, xalign=0)
-        title.add_css_class("title-2")
-        header.append(title)
+        self._title_label = Gtk.Label(label=profile.stem, xalign=0)
+        self._title_label.add_css_class("title-2")
+        header.append(self._title_label)
         spacer = Gtk.Box(hexpand=True)
         header.append(spacer)
+        rename_btn = Gtk.Button(icon_name="document-edit-symbolic")
+        rename_btn.add_css_class("flat")
+        rename_btn.set_tooltip_text(_("Renombrar perfil"))
+        rename_btn.connect("clicked", lambda _b: self._rename_profile())
+        header.append(rename_btn)
         close_btn = Gtk.Button(label=_("Cerrar"))
         close_btn.connect("clicked", lambda _b: self.close())
         header.append(close_btn)
@@ -114,6 +119,61 @@ class ProfileDetailDialog(Adw.Dialog):
         self.set_child(outer)
         self._load_accounts()
         self._load_vfs()
+
+    def _rename_profile(self) -> None:
+        dlg = Adw.AlertDialog.new(_("Renombrar perfil"), "")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(12)
+        box.set_margin_bottom(12)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+
+        entry = Gtk.Entry()
+        entry.set_text(self.profile.stem)
+        entry.set_placeholder_text(_("nombre del perfil"))
+        box.append(entry)
+
+        dlg.set_extra_child(box)
+        dlg.add_response("cancel", _("Cancelar"))
+        dlg.add_response("rename", _("Renombrar"))
+        dlg.set_response_appearance("rename", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("rename")
+        dlg.set_close_response("cancel")
+
+        def on_response(d, response):
+            if response == "rename":
+                new_name = entry.get_text().strip()
+                if not new_name:
+                    d.close() if hasattr(d, "close") else None
+                    return
+                old_path = self.profile
+                try:
+                    new_path = profile_store.rename_profile(old_path, new_name)
+                except Exception as exc:
+                    self.window.toast(_("Error: {exc}").format(exc=exc))
+                    d.close() if hasattr(d, "close") else None
+                    return
+                self.profile = new_path
+                self.set_title(_("Perfil: {n}").format(n=new_path.stem))
+                self._title_label.set_label(new_path.stem)
+                # Update window current profile if it was this one
+                try:
+                    if self.window.current_profile == old_path:
+                        self.window.set_current_profile(new_path)
+                except Exception:
+                    pass
+                # Refresh profiles list
+                try:
+                    self.window.profiles_page.refresh()
+                except Exception:
+                    pass
+                self._load_accounts()
+                self._load_vfs()
+                self.window.toast(_("Perfil renombrado a '{name}'").format(name=new_path.stem))
+            d.close() if hasattr(d, "close") else None
+
+        dlg.connect("response", on_response)
+        dlg.present(self.window)
 
     # ---------- Accounts ----------
     def _load_accounts(self) -> None:
