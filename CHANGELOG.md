@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.1.4 (2026-11-27)
+
+### Bug Fixes
+
+- Add commit hash to manifest source
+  ([`4ba0dc3`](https://github.com/MFApplications/RCSyncit-MF/commit/4ba0dc3186ace2e3aa5f8c503a436cc7fa5779d6))
+
+- Remove commit hash from manifest source (tag only)
+  ([`8934bfc`](https://github.com/MFApplications/RCSyncit-MF/commit/8934bfc83ebe0f9623eaa2f2c91acbfbf78e8543))
+
+
 ## v1.1.0 (2026-11-27)
 
 ### Chores
