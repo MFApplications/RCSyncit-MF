@@ -76,38 +76,7 @@ def _save(data: list[dict]) -> None:
 
 def is_mounted(mountpoint: Path) -> bool:
     mp = str(mountpoint)
-    if in_flatpak():
-        # The mount lives on the host; check there.
-        try:
-            import subprocess as _sp
-
-            proc = _sp.run(
-                ["flatpak-spawn", "--host", "mountpoint", mp],
-                capture_output=True,
-                text=True,
-            )
-            if proc.returncode == 0:
-                return True
-        except (OSError, FileNotFoundError):
-            pass
-        # Safe fallback: read /proc/mounts from the host and parse in Python
-        # (no shell interpolation of the mountpoint path).
-        try:
-            import subprocess as _sp
-
-            proc = _sp.run(
-                ["flatpak-spawn", "--host", "cat", "/proc/mounts"],
-                capture_output=True,
-                text=True,
-            )
-            if proc.returncode == 0:
-                for line in proc.stdout.splitlines():
-                    parts = line.split()
-                    if len(parts) >= 2 and parts[1] == mp:
-                        return True
-        except (OSError, FileNotFoundError):
-            pass
-        return False
+    # /proc/mounts check (works inside the Flatpak sandbox for our own mounts)
     # /proc/mounts check
     try:
         with open("/proc/mounts", encoding="utf-8") as f:
@@ -228,12 +197,9 @@ async def mount(
     import asyncio as _asyncio
     import subprocess as _subprocess
 
-    if in_flatpak():
-        cmd = ["flatpak-spawn", "--host", "rclone", "--config", str(config), *list(args)]
-    else:
-        from .rclone import rclone_bin
+    from .rclone import rclone_bin
 
-        cmd = [rclone_bin(), "--config", str(config), *list(args)]
+    cmd = [rclone_bin(), "--config", str(config), *list(args)]
 
     # Resolve cached password for encrypted profiles.
     env = None

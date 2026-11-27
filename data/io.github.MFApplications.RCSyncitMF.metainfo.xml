@@ -5,10 +5,10 @@
   <summary>Gestor GNOME para rclone</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
-  <developer_name>RCSyncitMF</developer_name>
-  <url type="homepage">https://github.com/sebas/RCSyncit-MF</url>
-  <url type="bugtracker">https://github.com/sebas/RCSyncit-MF/issues</url>
-  <url type="vcs-browser">https://github.com/sebas/RCSyncit-MF</url>
+  <developer_name>MF Applications</developer_name>
+  <url type="homepage">https://github.com/MFApplications/RCSyncit-MF</url>
+  <url type="bugtracker">https://github.com/MFApplications/RCSyncit-MF/issues</url>
+  <url type="vcs-browser">https://github.com/MFApplications/RCSyncit-MF</url>
   <description>
     <p>RCSyncitMF permite gestionar múltiples archivos de configuración de rclone, remotos, unions y mounts desde una interfaz GNOME (libadwaita), incluyendo sincronización de la estructura de directorios entre upstreams de un union.</p>
   </description>
@@ -21,7 +21,25 @@
     <category>Utility</category>
   </categories>
   <releases>
-    <release version="0.1.0" date="2026-11-15"/>
+    <release version="1.1.1" date="2026-11-27"/>
   </releases>
   <content_rating type="oars-1.1"/>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/MFApplications/RCSyncit-MF/main/data/screenshots/1.png</image>
+      <caption>Ventana principal</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/MFApplications/RCSyncit-MF/main/data/screenshots/2.png</image>
+      <caption>Sincronización de unions</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/MFApplications/RCSyncit-MF/main/data/screenshots/3.png</image>
+      <caption>Mounts y VFS</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/MFApplications/RCSyncit-MF/main/data/screenshots/4.png</image>
+      <caption>Remotos y perfiles</caption>
+    </screenshot>
+  </screenshots>
 </component>
