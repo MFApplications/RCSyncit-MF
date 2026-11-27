@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-11-27)
+
+### Chores
+
+- Align __version__ with 1.0.3
+  ([`1fbc04f`](https://github.com/MFApplications/RCSyncit-MF/commit/1fbc04f119a1982b63d7975bbe6da11ffce0a8cd))
+
+
 ## v1.0.3 (2026-11-24)
 
 ### Bug Fixes
