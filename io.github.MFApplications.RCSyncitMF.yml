@@ -13,7 +13,6 @@ finish-args:
   - --filesystem=home
   - --filesystem=xdg-config
   - --filesystem=xdg-cache
-  - --talk-name=org.freedesktop.Flatpak
 modules:
   - name: tomli-w
     buildsystem: simple
@@ -23,13 +22,28 @@ modules:
       - type: file
         url: https://files.pythonhosted.org/packages/c7/18/c86eb8e0202e32dd3df50d43d7ff9854f8e0603945ff398974c1d91ac1ef/tomli_w-1.2.0-py3-none-any.whl
         sha256: 188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90
+  - name: rclone
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 rclone /app/bin/rclone
+    sources:
+      - type: archive
+        url: https://github.com/rclone/rclone/releases/download/v1.68.2/rclone-v1.68.2-linux-amd64.zip
+        sha256: 0e6fa18051e67fc600d803a2dcb10ddedb092247fc6eee61be97f64ec080a13c
+        only-arches: [x86_64]
+      - type: archive
+        url: https://github.com/rclone/rclone/releases/download/v1.68.2/rclone-v1.68.2-linux-arm64.zip
+        sha256: c6e9d4cf9c88b279f6ad80cd5675daebc068e404890fa7e191412c1bc7a4ac5f
+        only-arches: [aarch64]
   - name: rcsyncitmf
     buildsystem: simple
     build-commands:
       - python3 -m pip install --prefix=/app --no-deps --no-build-isolation .
       - install -Dm644 data/io.github.MFApplications.RCSyncitMF.desktop /app/share/applications/io.github.MFApplications.RCSyncitMF.desktop
       - install -Dm644 data/icons/hicolor/scalable/apps/io.github.MFApplications.RCSyncitMF.svg /app/share/icons/hicolor/scalable/apps/io.github.MFApplications.RCSyncitMF.svg
+      - for size in 128 256 512; do install -Dm644 data/icons/hicolor/${size}x${size}/apps/io.github.MFApplications.RCSyncitMF.png /app/share/icons/hicolor/${size}x${size}/apps/io.github.MFApplications.RCSyncitMF.png; done
       - install -Dm644 data/io.github.MFApplications.RCSyncitMF.metainfo.xml /app/share/metainfo/io.github.MFApplications.RCSyncitMF.metainfo.xml
     sources:
-      - type: dir
-        path: .
+      - type: git
+        url: https://github.com/MFApplications/RCSyncit-MF.git
+        tag: v1.0.4

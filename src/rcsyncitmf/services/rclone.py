@@ -56,7 +56,7 @@ async def run(
     """Run rclone with the given args. Returns stdout. Raises RcloneError on failure."""
     last_err: RcloneError | None = None
     for attempt in range(retries + 1):
-        cmd = ["flatpak-spawn", "--host", "rclone"] if in_flatpak() else [rclone_bin()]
+        cmd = [rclone_bin()]
         if config is not None:
             cmd += ["--config", str(config)]
         cmd += list(args)
@@ -240,10 +240,7 @@ def _load_providers_sync() -> list[dict]:
     import subprocess as _subprocess
 
     try:
-        if in_flatpak():
-            cmd = ["flatpak-spawn", "--host", "rclone", "config", "providers"]
-        else:
-            cmd = [rclone_bin(), "config", "providers"]
+        cmd = [rclone_bin(), "config", "providers"]
         proc = _subprocess.run(
             cmd,
             capture_output=True,
