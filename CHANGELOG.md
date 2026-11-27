@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.0.3 (2026-11-24)
+
+### Bug Fixes
+
+- Mount unions via crypt and sync folder structure across upstreams
+  ([`5f073af`](https://github.com/MFApplications/RCSyncit-MF/commit/5f073af18119b9a197b59ee712f1fd7923fd84d9))
+
+- Use effective mountpoint in unions _on_mount
+  ([`a7b707d`](https://github.com/MFApplications/RCSyncit-MF/commit/a7b707d48096e61574db9307664cb3a9cbd78c6f))
+
+
 ## v1.0.2 (2026-11-19)
 
 ### Bug Fixes
