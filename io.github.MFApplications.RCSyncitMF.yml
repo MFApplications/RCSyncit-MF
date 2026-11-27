@@ -7,12 +7,11 @@ finish-args:
   - --share=ipc
   - --socket=fallback-x11
   - --socket=wayland
-  - --device=dri
   - --device=all
   - --share=network
   - --filesystem=home
-  - --filesystem=xdg-config
-  - --filesystem=xdg-cache
+  - --filesystem=xdg-config/rcsyncitmf:create
+  - --filesystem=xdg-cache/rclone:create
 modules:
   - name: tomli-w
     buildsystem: simple
@@ -47,3 +46,4 @@ modules:
       - type: git
         url: https://github.com/MFApplications/RCSyncit-MF.git
         tag: v1.1.1
+        commit: d331d71c916c085d3a0ae89e3db7834a5a6bd58a
