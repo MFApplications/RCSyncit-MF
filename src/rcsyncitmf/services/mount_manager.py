@@ -263,12 +263,6 @@ async def unmount(mountpoint: Path) -> None:
         ["fusermount", "-u", str(mountpoint)],
         ["umount", str(mountpoint)],
     )
-    if in_flatpak():
-        cmds = (
-            ["flatpak-spawn", "--host", "fusermount3", "-u", str(mountpoint)],
-            ["flatpak-spawn", "--host", "fusermount", "-u", str(mountpoint)],
-            ["flatpak-spawn", "--host", "umount", str(mountpoint)],
-        )
     for cmd in cmds:
         try:
             proc = await asyncio.create_subprocess_exec(
