@@ -73,6 +73,27 @@ def delete_state(profile: Path, union_name: str) -> None:
         data["states"].pop(_key(profile, union_name), None)
         _save_all_unlocked(data)
 
+def rename_profile(old_path: Path, new_path: Path) -> None:
+    """Move all sync baselines from *old_path* to *new_path*."""
+    old_prefix = f"{Path(old_path).resolve()}::"
+    new_prefix = f"{Path(new_path).resolve()}::"
+    with _STATE_LOCK:
+        data = _load_all_unlocked()
+        for key in [k for k in list(data["states"]) if k.startswith(old_prefix)]:
+            new_key = new_prefix + key[len(old_prefix):]
+            data["states"][new_key] = data["states"].pop(key)
+        _save_all_unlocked(data)
+
+
+def delete_profile(profile: Path) -> None:
+    """Remove all sync baselines belonging to *profile*."""
+    prefix = f"{Path(profile).resolve()}::"
+    with _STATE_LOCK:
+        data = _load_all_unlocked()
+        for key in [k for k in list(data["states"]) if k.startswith(prefix)]:
+            data["states"].pop(key, None)
+        _save_all_unlocked(data)
+
 
 def last_sync(profile: Path, union_name: str) -> str | None:
     st = load_state(profile, union_name)

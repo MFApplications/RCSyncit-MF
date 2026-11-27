@@ -347,6 +347,29 @@ def list_mounts() -> list[dict]:
     return _load()
 
 
+def rename_profile_mounts(old_path: Path, new_path: Path) -> None:
+    """Update persisted mount records whose config points to *old_path*."""
+    old_strs = {str(old_path), str(Path(old_path).resolve())}
+    new_str = str(new_path)
+    with _MOUNTS_LOCK:
+        data = _load_unlocked()
+        changed = False
+        for rec in data:
+            if isinstance(rec, dict) and str(rec.get("config", "")) in old_strs:
+                rec["config"] = new_str
+                changed = True
+        if changed:
+            _save_unlocked(data)
+
+
+def delete_profile_mounts(profile: Path) -> None:
+    """Remove persisted mount records belonging to *profile*."""
+    strs = {str(profile), str(Path(profile).resolve())}
+    with _MOUNTS_LOCK:
+        data = [r for r in _load_unlocked() if not (isinstance(r, dict) and str(r.get("config", "")) in strs)]
+        _save_unlocked(data)
+
+
 def _safe_remote(name: str) -> str:
     return "".join(ch if (ch.isalnum() or ch in "-_.") else "_" for ch in str(name))
 
